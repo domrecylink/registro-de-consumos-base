@@ -1526,6 +1526,33 @@ textarea.prt-input { height: auto; padding: 12px 14px; line-height: 1.5; resize:
   margin-bottom: 12px;
 }
 
+/* Banner indicador de trabajos en segundo plano */
+.rc-foto-inflight {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--rl-primary-50, #eff6ff);
+  border: 1px solid var(--rl-primary-300, #93c5fd);
+  margin-bottom: 12px;
+  font: 600 13px/1.3 var(--rl-font-display);
+  color: var(--rl-primary-900);
+}
+.rc-foto-inflight-label { flex: 1; min-width: 0; }
+.rc-foto-inflight-hint {
+  font: 500 12px/1 var(--rl-font-body);
+  color: var(--rl-gray-600);
+}
+
+/* Fila fantasma — upload en curso */
+.rc-foto-row-ghost {
+  background: linear-gradient(90deg, var(--rl-primary-50) 0%, transparent 100%);
+  animation: foto-pulse 1.6s ease-in-out infinite;
+}
+@keyframes foto-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1.0; }
+}
+
 /* Cola — fila de la lista */
 .rc-foto-row {
   display: flex; align-items: center; gap: 12px;

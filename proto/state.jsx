@@ -138,7 +138,7 @@ const initialState = {
   manualStep: "form",         // form | preview | success
   uploadStep: 1,              // 1 | 2 | 3 | 4 (preview)
   // fotos (módulo "Tomar foto")
-  fotos: { rows: [], loading: false, error: null, invalidatedAt: 0 },
+  fotos: { rows: [], loading: false, error: null, invalidatedAt: 0, inflightJobs: [] },
   fotoCompleteRow: null,      // rowIndex de la fila siendo completada
   // domain — empty by default; populated from Google Sheets on login + refresh
   records: [],
@@ -215,6 +215,10 @@ function reducer(state, action) {
       return { ...state, fotos: { ...state.fotos, loading: false, error: action.error || "Error desconocido" } };
     case "FOTO/INVALIDATE":
       return { ...state, fotos: { ...state.fotos, invalidatedAt: state.fotos.invalidatedAt + 1 } };
+    case "FOTO/JOB_START":
+      return { ...state, fotos: { ...state.fotos, inflightJobs: [...(state.fotos.inflightJobs || []), action.job] } };
+    case "FOTO/JOB_END":
+      return { ...state, fotos: { ...state.fotos, inflightJobs: (state.fotos.inflightJobs || []).filter(j => j.id !== action.id) } };
 
     // ----- Manual draft
     case "MANUAL/SET_SHARED_FIELD": {

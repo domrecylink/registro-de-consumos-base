@@ -2,9 +2,14 @@
 // pestañas Nueva / Cola. Completar datos abre una vista aparte (FotoCompleteView).
 // Mobile-first: foto al principio del form, solo foto obligatoria, resto opcional.
 
+// Genera un id único corto para identificar trabajos en background.
+function newJobId() {
+  return "j" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+}
+
 // ----- Captura (sub-componente de FotoHubView) ---------------------------
 const FotoCaptureForm = ({ onUploaded }) => {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
 
   const sucursales = (state.configSucursales || []).filter(s => s.activa);
   const sucOptions = sucursales.map(s => ({ value: s.nombre, label: s.nombre }));
@@ -26,7 +31,6 @@ const FotoCaptureForm = ({ onUploaded }) => {
   const [notas, setNotas]       = React.useState("");
   const [file, setFile]         = React.useState(null);
   const [previewUrl, setPrev]   = React.useState("");
-  const [uploading, setUp]      = React.useState(false);
   const [error, setError]       = React.useState("");
   const fileInputRef = React.useRef(null);
 
@@ -51,24 +55,36 @@ const FotoCaptureForm = ({ onUploaded }) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const canSubmit = !!file && !uploading;
+  const canSubmit = !!file;
 
-  const onSubmit = async () => {
+  // Upload en background: el form se limpia y cambia a Cola al instante,
+  // la subida (file→base64→Drive→Sheet) corre en segundo plano.
+  const onSubmit = () => {
     if (!canSubmit) return;
-    setUp(true);
-    setError("");
-    try {
-      const res = await rcUploadFoto({
-        file, tipo, sucursal, periodo,
-        subcat, consumo, unidad, costo, proveedor, notas,
-      });
-      reset();
-      if (onUploaded) onUploaded(res);
-    } catch (e) {
-      setError(String(e && e.message || e));
-    } finally {
-      setUp(false);
-    }
+    const params = {
+      file, tipo, sucursal, periodo,
+      subcat, consumo, unidad, costo, proveedor, notas,
+    };
+    const label = "Subiendo foto" + (file.name ? " · " + file.name : "");
+    const jobId = newJobId();
+    // 1) limpia form y switchea a Cola — usuario libre de seguir trabajando.
+    reset();
+    if (onUploaded) onUploaded({ pending: true, jobId });
+    // 2) marca job inflight + toast inicial.
+    dispatch({ type: "FOTO/JOB_START", job: { id: jobId, kind: "upload", label } });
+    dispatch({ type: "TOAST/SHOW", toast: { kind: "info", title: "Subiendo foto…", body: "Sigue trabajando, te aviso al terminar." } });
+    // 3) fire-and-forget.
+    (async () => {
+      try {
+        await rcUploadFoto(params);
+        dispatch({ type: "FOTO/INVALIDATE" });
+        dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Foto subida", body: "Disponible en la cola." } });
+      } catch (e) {
+        dispatch({ type: "TOAST/SHOW", toast: { kind: "error", title: "Error subiendo foto", body: String(e && e.message || e) } });
+      } finally {
+        dispatch({ type: "FOTO/JOB_END", id: jobId });
+      }
+    })();
   };
 
   const [openOpcional, setOpenOpcional] = React.useState(false);
@@ -184,8 +200,8 @@ const FotoCaptureForm = ({ onUploaded }) => {
           </div>
         )}
         <div className="rc-foto-actions">
-          <Btn kind="primary" icon={uploading ? "hourglass_top" : "cloud_upload"} onClick={onSubmit} disabled={!canSubmit}>
-            {uploading ? "Subiendo…" : "Subir foto"}
+          <Btn kind="primary" icon="cloud_upload" onClick={onSubmit} disabled={!canSubmit}>
+            Subir foto
           </Btn>
         </div>
       </div>
@@ -252,17 +268,36 @@ const FotoColaSection = () => {
     return <Card><div className="prt-help error"><Icon name="error" size={14} /><span>{state.fotos.error}</span></div></Card>;
   }
 
+  const inflightJobs = state.fotos.inflightJobs || [];
+  const inflightUploads = inflightJobs.filter(j => j.kind === "upload");
+
   return (
     <>
       <Card flush>
         <div className="rc-home-card-head">
           <div>
-            <div className="rc-home-kpi">{pendientes.length}</div>
-            <div className="prt-hint" style={{ marginTop: 2 }}>pendientes</div>
+            <div className="rc-home-kpi">{pendientes.length + inflightUploads.length}</div>
+            <div className="prt-hint" style={{ marginTop: 2 }}>
+              pendientes{inflightUploads.length > 0 ? " · " + inflightUploads.length + " subiendo" : ""}
+            </div>
           </div>
         </div>
         <div className="rc-home-list">
-          {pendientes.length === 0
+          {inflightUploads.map(j => (
+            <div key={j.id} className="rc-foto-row rc-foto-row-ghost">
+              <span className="rc-foto-row-ico" style={{ background: "var(--rl-primary-50)", color: "var(--rl-primary-900)" }}>
+                <span className="prt-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+              </span>
+              <div className="rc-foto-row-body">
+                <div className="rc-foto-row-title">Subiendo foto…</div>
+                <div className="rc-foto-row-sub">{j.label}</div>
+              </div>
+              <div className="rc-foto-row-actions">
+                <Chip size="sm" kind="info">En curso</Chip>
+              </div>
+            </div>
+          ))}
+          {pendientes.length === 0 && inflightUploads.length === 0
             ? <div className="rc-home-empty"><Icon name="check_circle" size={28} style={{ color: "var(--rl-success-500)" }} /><div className="prt-hint" style={{ marginTop: 6 }}>Sin fotos pendientes.</div></div>
             : pendientes.map(renderRow)}
         </div>
@@ -287,17 +322,14 @@ const FotoColaSection = () => {
 
 // ----- Hub (Nueva | Cola) ------------------------------------------------
 const FotoHubView = () => {
-  const { dispatch } = useApp();
+  const { state } = useApp();
   const [tab, setTab] = React.useState("nueva"); // nueva | cola
-  const [lastUploaded, setLastUp] = React.useState(null);
 
-  const onUploaded = (res) => {
-    setLastUp(res);
-    dispatch({ type: "FOTO/INVALIDATE" });
-    setTab("cola");
-  };
+  const onUploaded = () => setTab("cola");
 
-  const pendCount = useApp().state.fotos.rows.filter(r => (r.status || "").toLowerCase() !== "procesado").length;
+  const rows = state.fotos.rows || [];
+  const pendCount = rows.filter(r => (r.status || "").toLowerCase() !== "procesado").length;
+  const inflightJobs = state.fotos.inflightJobs || [];
 
   return (
     <div>
@@ -323,10 +355,15 @@ const FotoHubView = () => {
         </button>
       </div>
 
-      {lastUploaded && tab === "cola" && (
-        <div className="rc-foto-toast">
-          <Icon name="check" size={16} />
-          <span>Foto subida. Pendiente de completar datos.</span>
+      {inflightJobs.length > 0 && (
+        <div className="rc-foto-inflight">
+          <span className="prt-spinner" />
+          <span className="rc-foto-inflight-label">
+            {inflightJobs.length === 1
+              ? inflightJobs[0].label + "…"
+              : inflightJobs.length + " procesos en segundo plano…"}
+          </span>
+          <span className="rc-foto-inflight-hint">Puedes seguir usando la app.</span>
         </div>
       )}
 
@@ -354,7 +391,6 @@ const FotoCompleteView = () => {
   const [tipo, setTipo]         = React.useState("");
   const [sucursal, setSucursal] = React.useState("");
   const [periodo, setPeriodo]   = React.useState("");
-  const [saving, setSaving]     = React.useState(false);
   const [error, setError]       = React.useState("");
 
   React.useEffect(() => {
@@ -392,25 +428,37 @@ const FotoCompleteView = () => {
     : [];
   const providerOptions = (tipo && sucursal) ? getProviderOptionsFor(state, sucursal, tipo) : [];
 
-  const onSave = async () => {
-    setSaving(true); setError("");
-    try {
-      // Usamos los valores efectivos del form (pueden haber sido editados aquí).
-      const effectiveRow = { ...row, tipo, sucursal, periodo };
-      await rcCompleteFoto({
-        fileId: row.fileId,
-        rowIndex: row.rowIndex,
-        patch: { consumo, unidad, costo, proveedor, subcat, notas },
-        fotoRow: effectiveRow,
-      });
-      dispatch({ type: "FOTO/INVALIDATE" });
-      dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Foto procesada", body: "Datos guardados y archivo movido a Procesados." } });
-      go("foto-hub");
-    } catch (e) {
-      setError(String(e && e.message || e));
-    } finally {
-      setSaving(false);
-    }
+  // Procesa en background: navegamos de vuelta a la cola al instante,
+  // las llamadas a Apps Script (update × N + append + move + refresh) corren
+  // sin bloquear la UI.
+  const onSave = () => {
+    if (!consumo) { setError("Consumo es obligatorio."); return; }
+    setError("");
+    const params = {
+      fileId: row.fileId,
+      rowIndex: row.rowIndex,
+      patch: { consumo, unidad, costo, proveedor, subcat, notas },
+      fotoRow: { ...row, tipo, sucursal, periodo },
+    };
+    const label = "Procesando foto · fila " + row.rowIndex;
+    const jobId = newJobId();
+    // 1) Volvemos a la cola enseguida.
+    go("foto-hub");
+    // 2) Marca el job + toast inicial.
+    dispatch({ type: "FOTO/JOB_START", job: { id: jobId, kind: "complete", label } });
+    dispatch({ type: "TOAST/SHOW", toast: { kind: "info", title: "Procesando foto…", body: "Guardando datos y moviendo archivo." } });
+    // 3) fire-and-forget.
+    (async () => {
+      try {
+        await rcCompleteFoto(params);
+        dispatch({ type: "FOTO/INVALIDATE" });
+        dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Foto procesada", body: "Datos guardados y reflejados en el dashboard." } });
+      } catch (e) {
+        dispatch({ type: "TOAST/SHOW", toast: { kind: "error", title: "Error procesando foto", body: String(e && e.message || e) } });
+      } finally {
+        dispatch({ type: "FOTO/JOB_END", id: jobId });
+      }
+    })();
   };
 
   return (
@@ -472,8 +520,8 @@ const FotoCompleteView = () => {
             </Field>
             {error && <div className="prt-help error"><Icon name="error" size={14} /><span>{error}</span></div>}
             <div className="prt-row" style={{ gap: 10, marginTop: 4, flexWrap: "wrap" }}>
-              <Btn kind="primary" icon={saving ? "hourglass_top" : "check"} onClick={onSave} disabled={saving || !consumo}>
-                {saving ? "Guardando…" : "Guardar y procesar"}
+              <Btn kind="primary" icon="check" onClick={onSave} disabled={!consumo}>
+                Guardar y procesar
               </Btn>
               <Btn onClick={() => go("foto-hub")}>Cancelar</Btn>
             </div>
