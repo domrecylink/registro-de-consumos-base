@@ -12,7 +12,7 @@
 // PEGAR_*_ANDO con los valores reales antes de desplegar a Netlify.
 const RC_CONFIG = {
   // 👉 URL /exec del Apps Script desplegado sobre la planilla de Ando.
-  APPS_SCRIPT_URL: "PEGAR_APPS_SCRIPT_URL_ANDO",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx8lv-j6Z98X4QnoAHMQy-vmVihcxkec6cdcPCqAvE9E_p_0b7nOHCaNEQMJAki8LULwA/exec",
 
   // 👉 URL completa de la planilla "Copia de Registro de Consumo - Sandbox"
   //    (carpeta Drive: 8 TI/8.5 Registros de Consumo/Ando).
@@ -27,10 +27,10 @@ const RC_CONFIG = {
 
   FOLDERS: {
     // 👉 IDs de carpetas Drive de Ando (los sacas de la URL al abrir cada carpeta).
-    ENEL_POR_PROCESAR:  "PEGAR_ENEL_POR_PROCESAR_ANDO",
-    ENEL_PROCESADOS:    "PEGAR_ENEL_PROCESADOS_ANDO",
-    AGUAS_POR_PROCESAR: "PEGAR_AGUAS_POR_PROCESAR_ANDO",
-    AGUAS_PROCESADOS:   "PEGAR_AGUAS_PROCESADOS_ANDO",
+    ENEL_POR_PROCESAR:  "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz",
+    ENEL_PROCESADOS:    "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9",
+    AGUAS_POR_PROCESAR: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE",
+    AGUAS_PROCESADOS:   "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R",
     // Folder where manual-entry facturas/boletas land. Leave empty to skip the upload
     // (the filename will still be captured locally on the record).
     MANUAL_FACTURAS:    "",
