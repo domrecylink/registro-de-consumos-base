@@ -41,7 +41,10 @@
  * Implementar. La URL no cambia.
  */
 
-const CONFIG = {
+// WEB_CFG en vez de CONFIG porque el procesador de Combustible (archivo Código.gs
+// en el proyecto Apps Script) ya declara `var CONFIG`. Si usáramos el mismo nombre
+// Apps Script lanza "Identifier 'CONFIG' has already been declared". Convivimos.
+const WEB_CFG = {
   // 👉 INSTANCIA ANDO. Si copias este archivo a la planilla Euro, cambia este ID.
   SPREADSHEET_ID: "1Aa0daLD5uyHbgQuxWGsxUADJXw4eqU7Qhr7kyDjK7_w",
   FOLDERS: {
@@ -130,7 +133,7 @@ function jsonOut(obj) {
 // ----- Operations --------------------------------------------------------
 
 function readAll() {
-  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   const result = {};
   ["Combustible", "Electricidad", "Agua"].forEach(function (name) {
     const sheet = ss.getSheetByName(name);
@@ -143,11 +146,11 @@ function readAll() {
 function appendRows(sheetName, values) {
   if (!sheetName) throw new Error("sheet name missing");
   if (!values || !values.length) return;
-  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    const headers = CONFIG.HEADERS[sheetName];
+    const headers = WEB_CFG.HEADERS[sheetName];
     if (headers) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   const start = sheet.getLastRow() + 1;
@@ -157,7 +160,7 @@ function appendRows(sheetName, values) {
 function updateCell(sheetName, row, col, value) {
   if (!sheetName) throw new Error("sheet name missing");
   if (!row || !col) throw new Error("row/col missing");
-  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error("sheet not found: " + sheetName);
   sheet.getRange(row, col).setValue(value);
@@ -179,11 +182,11 @@ function moveFile(fileId, fromFolderId, toFolderId) {
 }
 
 function ensureSheets() {
-  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  Object.keys(CONFIG.HEADERS).forEach(function (name) {
+  const ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
+  Object.keys(WEB_CFG.HEADERS).forEach(function (name) {
     if (!ss.getSheetByName(name)) {
       const sh = ss.insertSheet(name);
-      const headers = CONFIG.HEADERS[name];
+      const headers = WEB_CFG.HEADERS[name];
       sh.getRange(1, 1, 1, headers.length).setValues([headers]);
     }
   });
@@ -193,7 +196,7 @@ function ensureSheets() {
 
 function getConfigValue(key) {
   if (!key) return { value: null };
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName("Config");
   if (!sheet) return { value: null };
   var data = sheet.getDataRange().getValues();
@@ -207,7 +210,7 @@ function getConfigValue(key) {
 
 function setConfigValue(key, value) {
   if (!key) throw new Error("key missing");
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName("Config");
   if (!sheet) {
     sheet = ss.insertSheet("Config");
@@ -234,7 +237,7 @@ var CONFIG_SUC_HEADERS = [
 ];
 
 function getConfigSucursales() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(CONFIG_SUC_SHEET);
   if (!sheet) return { rows: [] };
   var data = sheet.getDataRange().getValues();
@@ -242,7 +245,7 @@ function getConfigSucursales() {
 }
 
 function setConfigSucursales(rows) {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(CONFIG_SUC_SHEET);
   if (!sheet) sheet = ss.insertSheet(CONFIG_SUC_SHEET);
   sheet.clear();
@@ -261,7 +264,7 @@ var EMISSIONS_HEADERS = [
 ];
 
 function getEmissions() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(EMISSIONS_SHEET);
   if (!sheet) return { rows: [] };
   var data = sheet.getDataRange().getValues();
@@ -269,7 +272,7 @@ function getEmissions() {
 }
 
 function setEmissions(rows) {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName(EMISSIONS_SHEET);
   if (!sheet) sheet = ss.insertSheet(EMISSIONS_SHEET);
   sheet.clear();
@@ -281,10 +284,10 @@ function setEmissions(rows) {
 
 // ----- Fotos (módulo "Tomar foto") --------------------------------------
 // La hoja "Fotos" se crea automáticamente en el primer `append` usando
-// CONFIG.HEADERS.Fotos. uploadFile / appendRows / updateCell / moveFile ya
+// WEB_CFG.HEADERS.Fotos. uploadFile / appendRows / updateCell / moveFile ya
 // existen; sólo agregamos el getter de lectura de la cola.
 function getFotos() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = SpreadsheetApp.openById(WEB_CFG.SPREADSHEET_ID);
   var sheet = ss.getSheetByName("Fotos");
   if (!sheet) return { rows: [] };
   var data = sheet.getDataRange().getDisplayValues();
