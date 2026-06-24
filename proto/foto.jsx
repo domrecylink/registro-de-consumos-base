@@ -21,11 +21,22 @@ const FotoCaptureForm = ({ onUploaded }) => {
   const [tipo, setTipo]         = React.useState("");
   const [sucursal, setSucursal] = React.useState("");
   const [periodo, setPeriodo]   = React.useState(isoMonth);
+  const [subcat, setSubcat]     = React.useState("");
+  const [consumo, setConsumo]   = React.useState("");
+  const [unidad, setUnidad]     = React.useState("");
+  const [costo, setCosto]       = React.useState("");
+  const [proveedor, setProv]    = React.useState("");
+  const [notas, setNotas]       = React.useState("");
   const [file, setFile]         = React.useState(null);
   const [previewUrl, setPrev]   = React.useState("");
   const [uploading, setUp]      = React.useState(false);
   const [error, setError]       = React.useState("");
   const fileInputRef = React.useRef(null);
+
+  // Defaults derivados: unidad sigue al tipo si no se eligió manualmente.
+  React.useEffect(() => {
+    if (!unidad && tipo && TYPES[tipo]?.unit) setUnidad(TYPES[tipo].unit);
+  }, [tipo]);
 
   const onFileChange = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -36,7 +47,9 @@ const FotoCaptureForm = ({ onUploaded }) => {
   };
 
   const reset = () => {
-    setTipo(""); setSucursal(""); setFile(null); setPrev("");
+    setTipo(""); setSucursal(""); setPeriodo(isoMonth);
+    setSubcat(""); setConsumo(""); setUnidad(""); setCosto(""); setProv(""); setNotas("");
+    setFile(null); setPrev("");
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -48,7 +61,10 @@ const FotoCaptureForm = ({ onUploaded }) => {
     setUp(true);
     setError("");
     try {
-      const res = await rcUploadFoto({ file, tipo, sucursal, periodo });
+      const res = await rcUploadFoto({
+        file, tipo, sucursal, periodo,
+        subcat, consumo, unidad, costo, proveedor, notas,
+      });
       reset();
       if (onUploaded) onUploaded(res);
     } catch (e) {
@@ -60,7 +76,14 @@ const FotoCaptureForm = ({ onUploaded }) => {
 
   const [openOpcional, setOpenOpcional] = React.useState(false);
   const optionalCount =
-    (tipo ? 1 : 0) + (sucursal ? 1 : 0) + (periodo && periodo !== isoMonth ? 1 : 0);
+    (tipo ? 1 : 0) + (sucursal ? 1 : 0) + (periodo && periodo !== isoMonth ? 1 : 0) +
+    (subcat ? 1 : 0) + (consumo ? 1 : 0) + (costo ? 1 : 0) +
+    (proveedor ? 1 : 0) + (notas ? 1 : 0);
+
+  const subcatOptions = tipo
+    ? getSubcatsFor(state, tipo, sucursal).map(s => ({ value: s.id, label: s.label }))
+    : [];
+  const providerOptions = (tipo && sucursal) ? getProviderOptionsFor(state, sucursal, tipo) : [];
 
   return (
     <Card>
@@ -122,13 +145,37 @@ const FotoCaptureForm = ({ onUploaded }) => {
         {openOpcional && (
           <div className="rc-foto-collapse-body">
             <Field label="Tipo de consumo">
-              <Select value={tipo} onChange={setTipo} options={tipoOptions} placeholder="Elige tipo" />
+              <Select value={tipo} onChange={(v) => { setTipo(v); setSubcat(""); }} options={tipoOptions} placeholder="Elige tipo" />
             </Field>
             <Field label="Sucursal" helper={sucOptions.length === 0 ? "Configura sucursales para asignar." : undefined}>
               <Select value={sucursal} onChange={setSucursal} options={sucOptions} placeholder="Elige sucursal" />
             </Field>
             <Field label="Período (mes)">
               <Input type="month" value={periodo} onChange={setPeriodo} />
+            </Field>
+            {subcatOptions.length > 0 && (
+              <Field label="Subcategoría">
+                <Select value={subcat} onChange={setSubcat} options={subcatOptions} placeholder="—" />
+              </Field>
+            )}
+            <Field label="Consumo">
+              <Input value={consumo} onChange={setConsumo} suffix={unidad} type="number" />
+            </Field>
+            {tipo === "combustible" && (
+              <Field label="Unidad">
+                <Select value={unidad} onChange={setUnidad} options={["L", "kg", "m³", "gal", "t", "kWh"]} placeholder="Unidad" />
+              </Field>
+            )}
+            <Field label="Costo (CLP)">
+              <Input value={costo} onChange={setCosto} type="number" />
+            </Field>
+            <Field label="Proveedor">
+              {providerOptions.length > 0
+                ? <Select value={proveedor} onChange={setProv} options={providerOptions} placeholder="Elige proveedor" />
+                : <Input value={proveedor} onChange={setProv} placeholder="—" />}
+            </Field>
+            <Field label="Notas">
+              <Input value={notas} onChange={setNotas} placeholder="Opcional" />
             </Field>
           </div>
         )}

@@ -541,10 +541,14 @@ const FOTOS_HEADERS = [
   "Consumo", "Unidad", "Costo", "Proveedor", "Notas",
 ];
 
-async function rcUploadFoto({ file, tipo, sucursal, periodo, subcat }) {
+async function rcUploadFoto(params) {
   if (!rcEndpointConfigured()) throw new Error("Backend no configurado.");
   const folderId = RC_CONFIG.FOLDERS.FOTOS_POR_COMPLETAR;
   if (!folderId) throw new Error("FOTOS_POR_COMPLETAR no configurado en sync.jsx");
+  const {
+    file, tipo, sucursal, periodo, subcat,
+    consumo, unidad, costo, proveedor, notas,
+  } = params || {};
   const base64 = await rcFileToBase64(file);
   const up = await rcApiPost({
     action: "upload",
@@ -558,7 +562,8 @@ async function rcUploadFoto({ file, tipo, sucursal, periodo, subcat }) {
     up.id, up.link, fechaSubida,
     tipo || "", sucursal || "", subcat || "",
     periodo || "", "pendiente", "",
-    "", "", "", "", "",
+    consumo || "", unidad || "", costo || "",
+    proveedor || "", notas || "",
   ];
   await rcApiPost({ action: "append", sheet: FOTOS_SHEET, values: [row] });
   return { fileId: up.id, link: up.link };
@@ -634,9 +639,14 @@ async function rcCompleteFoto({ fileId, rowIndex, patch, fotoRow }) {
   if (!rcEndpointConfigured()) throw new Error("Backend no configurado.");
   if (!rowIndex) throw new Error("rowIndex requerido");
   const now = new Date().toISOString();
-  // Columnas que actualizamos (col index 1-based en hoja Fotos)
+  // Columnas que actualizamos (col index 1-based en hoja Fotos).
+  // Incluye tipo/sucursal/periodo para reflejar ediciones hechas en el form
+  // de Completar (no solo los datos nuevos del patch).
   const cells = [
+    [4,  (fotoRow && fotoRow.tipo)     || ""],
+    [5,  (fotoRow && fotoRow.sucursal) || ""],
     [6,  patch.subcat    || ""],
+    [7,  (fotoRow && fotoRow.periodo)  || ""],
     [8,  "procesado"],
     [9,  now],
     [10, patch.consumo   || ""],
