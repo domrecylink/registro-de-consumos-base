@@ -288,6 +288,7 @@ const FotoCompleteView = () => {
         fileId: row.fileId,
         rowIndex: row.rowIndex,
         patch: { consumo, unidad, costo, proveedor, subcat, notas },
+        fotoRow: row,
       });
       dispatch({ type: "FOTO/INVALIDATE" });
       dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Foto procesada", body: "Datos guardados y archivo movido a Procesados." } });

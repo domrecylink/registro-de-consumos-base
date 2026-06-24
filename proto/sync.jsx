@@ -588,7 +588,49 @@ async function rcReadFotos() {
   }));
 }
 
-async function rcCompleteFoto({ fileId, rowIndex, patch }) {
+// Period "YYYY-MM" → ISO "YYYY-MM-DD" del último día del mes.
+function rcLastDayOfMonth(yyyymm) {
+  if (!yyyymm || typeof yyyymm !== "string") return "";
+  const parts = yyyymm.split("-").map(Number);
+  if (parts.length < 2 || !parts[0] || !parts[1]) return "";
+  const [y, m] = parts;
+  const lastDay = new Date(y, m, 0).getDate();
+  return y + "-" + String(m).padStart(2, "0") + "-" + String(lastDay).padStart(2, "0");
+}
+
+// Construye fila para hoja Combustible/Electricidad/Agua a partir de una
+// foto completada. Devuelve null para refrigerantes u otros tipos sin sheet.
+function rcFotoToConsumptionRow(fotoRow, patch) {
+  const empresa   = RC_CONFIG.EMPRESA || "";
+  const sucursal  = fotoRow.sucursal || "";
+  const fecha     = rcLastDayOfMonth(fotoRow.periodo);
+  const consumo   = parseFloat(patch.consumo) || 0;
+  const costo     = parseFloat(patch.costo)   || 0;
+  const proveedor = patch.proveedor || "";
+  const link      = fotoRow.link || "";
+  const tipo      = fotoRow.tipo;
+  const subLabel  = (typeof subcatLabel === "function" && patch.subcat)
+    ? (subcatLabel(tipo, patch.subcat) || patch.subcat)
+    : (patch.subcat || "");
+  if (tipo === "combustible") {
+    return { sheet: "Combustible", values: [[
+      link, fecha, consumo, costo, empresa, sucursal, subLabel, proveedor, "activa",
+    ]]};
+  }
+  if (tipo === "electricidad") {
+    return { sheet: "Electricidad", values: [[
+      link, "", fecha, consumo, costo, empresa, sucursal, "Electricidad", proveedor, "activa",
+    ]]};
+  }
+  if (tipo === "agua") {
+    return { sheet: "Agua", values: [[
+      link, "", fecha, consumo, costo, empresa, sucursal, "Agua", proveedor, subLabel, "activa",
+    ]]};
+  }
+  return null;
+}
+
+async function rcCompleteFoto({ fileId, rowIndex, patch, fotoRow }) {
   if (!rcEndpointConfigured()) throw new Error("Backend no configurado.");
   if (!rowIndex) throw new Error("rowIndex requerido");
   const now = new Date().toISOString();
@@ -606,6 +648,18 @@ async function rcCompleteFoto({ fileId, rowIndex, patch }) {
   for (const [col, value] of cells) {
     await rcApiPost({ action: "update", sheet: FOTOS_SHEET, row: rowIndex, col, value });
   }
+  // Migrar copia a la hoja de consumo (Combustible/Electricidad/Agua) para
+  // que aparezca en el dashboard.
+  if (fotoRow) {
+    const target = rcFotoToConsumptionRow(fotoRow, patch);
+    if (target) {
+      try {
+        await rcApiPost({ action: "append", sheet: target.sheet, values: target.values });
+      } catch (e) {
+        console.warn("[rc-sync] migrate foto → " + target.sheet + " failed", e);
+      }
+    }
+  }
   if (fileId && RC_CONFIG.FOLDERS.FOTOS_PROCESADOS) {
     await rcApiPost({
       action: "move",
@@ -613,6 +667,10 @@ async function rcCompleteFoto({ fileId, rowIndex, patch }) {
       fromFolderId: RC_CONFIG.FOLDERS.FOTOS_POR_COMPLETAR,
       toFolderId:   RC_CONFIG.FOLDERS.FOTOS_PROCESADOS,
     });
+  }
+  // Refresca records para que la nueva fila aparezca en el dashboard.
+  if (typeof rcRefreshDashboard === "function") {
+    try { await rcRefreshDashboard(); } catch (e) {}
   }
 }
 
