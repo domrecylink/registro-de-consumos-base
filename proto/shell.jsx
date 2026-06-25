@@ -91,6 +91,123 @@ const Shell = () => {
         <ViewSwitcher />
       </div>
       <ToastHost />
+      <BuildBadge />
+    </div>
+  );
+};
+
+// ----- Easter egg: build/version badge ------------------------------------
+// Lee último commit de la rama main vía GitHub API. Muestra SHA corto +
+// mensaje + tiempo relativo. Sirve para confirmar que GitHub Pages ya
+// reconstruyó después de un push.
+//
+// Cómo abrirlo:
+//   1) Atajo: Ctrl+Shift+B (toggle).
+//   2) O click 5 veces en el logo "R" de la sidebar (<2s).
+//   Cerrar: Esc o click fuera.
+const BUILD_REPO = "domrecylink/registro-de-consumos-ando";
+
+const BuildBadge = () => {
+  const [open, setOpen] = React.useState(false);
+  const [data, setData] = React.useState(null);
+  const [err, setErr] = React.useState("");
+
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "B" || e.key === "b")) {
+        e.preventDefault();
+        setOpen(o => !o);
+      } else if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    const onLogoBurst = () => setOpen(o => !o);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("rc:toggle-build", onLogoBurst);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("rc:toggle-build", onLogoBurst);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!open || data) return;
+    fetch("https://api.github.com/repos/" + BUILD_REPO + "/commits/main")
+      .then(r => r.json())
+      .then(j => {
+        if (j && j.sha) {
+          setData({
+            sha: j.sha.slice(0, 7),
+            shaFull: j.sha,
+            message: ((j.commit && j.commit.message) || "").split("\n")[0],
+            date: j.commit && j.commit.author && j.commit.author.date,
+            url: j.html_url,
+          });
+        } else {
+          setErr((j && j.message) || "No se pudo cargar.");
+        }
+      })
+      .catch(e => setErr(String(e && e.message || e)));
+  }, [open]);
+
+  if (!open) return null;
+
+  const ago = (iso) => {
+    if (!iso) return "—";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (isNaN(ms)) return "—";
+    const m = Math.round(ms / 60000);
+    if (m < 1)  return "ahora";
+    if (m < 60) return "hace " + m + " min";
+    const h = Math.floor(m / 60);
+    if (h < 24) return "hace " + h + " h";
+    return "hace " + Math.floor(h / 24) + " d";
+  };
+
+  return (
+    <div
+      onClick={() => setOpen(false)}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.15)",
+        display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--rl-gray-900, #111)", color: "#eee",
+          borderRadius: 10, padding: "14px 18px", minWidth: 260, maxWidth: 380,
+          font: "500 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          boxShadow: "0 12px 32px rgba(0,0,0,.35)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ opacity: .6, textTransform: "uppercase", letterSpacing: ".06em", fontSize: 10 }}>build · main</span>
+          <button
+            onClick={() => setOpen(false)}
+            style={{ all: "unset", cursor: "pointer", opacity: .6, fontSize: 14 }}
+            aria-label="Cerrar"
+          >×</button>
+        </div>
+        {err && <div style={{ color: "#f88" }}>Error: {err}</div>}
+        {!err && !data && <div style={{ opacity: .6 }}>Cargando…</div>}
+        {data && (
+          <>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
+              <a href={data.url} target="_blank" rel="noopener" style={{ color: "#9cf", textDecoration: "none" }}>{data.sha}</a>
+              <span
+                onClick={() => { try { navigator.clipboard.writeText(data.shaFull); } catch (e) {} }}
+                style={{ marginLeft: 8, opacity: .5, cursor: "copy", fontSize: 11 }}
+                title="Copiar SHA completo"
+              >copy</span>
+            </div>
+            <div style={{ marginTop: 6, opacity: .85, fontFamily: "var(--rl-font-body)" }}>{data.message}</div>
+            <div style={{ marginTop: 6, opacity: .55, fontSize: 11 }}>{ago(data.date)} · {data.date && data.date.slice(0, 16).replace("T", " ")}</div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -140,7 +257,20 @@ const Sidebar = ({ collapsed, onToggle }) => {
       <div className="rc-sidebar-head">
         {!collapsed && (
           <div className="rc-sidebar-brand">
-            <span className="rc-sidebar-logo">R</span>
+            <span
+              className="rc-sidebar-logo"
+              onClick={() => {
+                window.__rcLogoClicks = window.__rcLogoClicks || [];
+                const now = Date.now();
+                window.__rcLogoClicks = window.__rcLogoClicks.filter(t => now - t < 2000);
+                window.__rcLogoClicks.push(now);
+                if (window.__rcLogoClicks.length >= 5) {
+                  window.__rcLogoClicks = [];
+                  window.dispatchEvent(new CustomEvent("rc:toggle-build"));
+                }
+              }}
+              style={{ cursor: "pointer" }}
+            >R</span>
             <span className="rc-sidebar-brand-text">Recylink</span>
           </div>
         )}
