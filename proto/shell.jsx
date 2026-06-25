@@ -28,19 +28,31 @@ function hashToView() {
 
 const RouterSync = () => {
   const { state, dispatch } = useApp();
+  const didInit = React.useRef(false);
 
-  // state.view → hash
+  // En el primer render: adoptar la view del hash actual (URL → state).
+  // Si no, el primer commit empuja la view inicial al hash y pisa la URL.
+  if (!didInit.current) {
+    didInit.current = true;
+    const fromHash = hashToView();
+    if (fromHash !== state.view) {
+      // Dispatch síncrono dentro del primer render — React lo deduplica
+      // antes de pintar; el siguiente render ya ve la view correcta.
+      dispatch({ type: "NAVIGATE", view: fromHash });
+    }
+  }
+
+  // state.view → hash (solo después del primer commit, para no pisar URL inicial)
+  const ready = React.useRef(false);
   React.useEffect(() => {
+    if (!ready.current) { ready.current = true; return; }
     const next = VIEW_HASH[state.view] || "/";
     const cur  = window.location.hash.replace(/^#/, "") || "/";
     if (cur !== next) window.location.hash = next;
   }, [state.view]);
 
-  // hash → state.view (back/forward + direct URL)
+  // hash → state.view (back/forward + direct URL changes)
   React.useEffect(() => {
-    const initial = hashToView();
-    if (initial !== state.view) dispatch({ type: "NAVIGATE", view: initial });
-
     const onHashChange = () => {
       const v = hashToView();
       if (v !== window.__rcCurrentView) dispatch({ type: "NAVIGATE", view: v });
