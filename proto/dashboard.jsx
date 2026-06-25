@@ -638,22 +638,65 @@ const RecentTable = () => {
   const commitEdit = (id, field, value) => {
     const rec = state.records.find(r => r.id === id);
     if (!rec) { setEditing(null); return; }
-    const parsed = parseFloat(value);
-    if (isNaN(parsed)) { setEditing(null); return; }
-    if (rec[field] === parsed) { setEditing(null); return; }
-    dispatch({ type: "DASH/EDIT_RECORD", id, patch: { [field]: parsed } });
-    try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field, value: parsed } })); } catch(e) {}
-    dispatch({ type: "TOAST/SHOW", toast: {
-      kind: "success",
-      title: field === "cantidad" ? "Cantidad actualizada" : "Costo actualizado",
-      body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtDate(rec.date)} · ${fmtNum(rec[field])} → ${fmtNum(parsed)}${field === "cantidad" ? " " + rec.unit : ""}`,
-      undoAction: () => dispatch({ type: "DASH/UNDO_EDIT" }),
-    }});
+    if (field === "cantidad" || field === "costo") {
+      const parsed = parseFloat(value);
+      if (isNaN(parsed) || rec[field] === parsed) { setEditing(null); return; }
+      dispatch({ type: "DASH/EDIT_RECORD", id, patch: { [field]: parsed } });
+      try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field, value: parsed } })); } catch(e) {}
+      dispatch({ type: "TOAST/SHOW", toast: {
+        kind: "success",
+        title: field === "cantidad" ? "Cantidad actualizada" : "Costo actualizado",
+        body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtDate(rec.date)} · ${fmtNum(rec[field])} → ${fmtNum(parsed)}${field === "cantidad" ? " " + rec.unit : ""}`,
+        undoAction: () => dispatch({ type: "DASH/UNDO_EDIT" }),
+      }});
+    } else if (field === "subcat") {
+      if (rec.subcat === value) { setEditing(null); return; }
+      dispatch({ type: "DASH/EDIT_RECORD", id, patch: { subcat: value || null } });
+      const lbl = value ? subcatLabel(rec.type, value) : "";
+      try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field: "subcat", value: lbl } })); } catch(e) {}
+      dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Subcategoría actualizada", body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${lbl || "—"}` } });
+    } else if (field === "provider") {
+      const v = String(value || "").trim();
+      if (rec.provider === v) { setEditing(null); return; }
+      dispatch({ type: "DASH/EDIT_RECORD", id, patch: { provider: v } });
+      try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field: "provider", value: v } })); } catch(e) {}
+      dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Proveedor actualizado", body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${v || "—"}` } });
+    }
     setEditing(null);
+  };
+
+  // Adjuntar documento a un registro existente.
+  const attachFileInputRef = React.useRef(null);
+  const [attachTarget, setAttachTarget] = React.useState(null);
+  const triggerAttach = (rec) => {
+    setAttachTarget(rec);
+    if (attachFileInputRef.current) attachFileInputRef.current.click();
+  };
+  const onAttachFileChange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (e.target) e.target.value = "";
+    const rec = attachTarget;
+    setAttachTarget(null);
+    if (!file || !rec) return;
+    dispatch({ type: "TOAST/SHOW", toast: { kind: "info", title: "Subiendo documento…", body: file.name } });
+    try {
+      const up = await window.rcAttachDocumentToRecord(rec, file);
+      dispatch({ type: "DASH/EDIT_RECORD", id: rec.id, patch: { _driveLink: up.link, factura: file.name } });
+      dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Documento adjuntado", body: file.name } });
+    } catch (err) {
+      dispatch({ type: "TOAST/SHOW", toast: { kind: "error", title: "Error al adjuntar", body: String(err && err.message || err) } });
+    }
   };
 
   return (
     <Card flush>
+      <input
+        ref={attachFileInputRef}
+        type="file"
+        accept="application/pdf,image/*"
+        style={{ display: "none" }}
+        onChange={onAttachFileChange}
+      />
       <div className="prt-card-head">
         <div>
           <div className="prt-h3">Tabla detallada · últimos registros</div>
@@ -714,8 +757,35 @@ const RecentTable = () => {
                   <td className={isDel ? "td-del" : ""}>{fmtDate(r.date)}</td>
                   <td className={isDel ? "td-del" : ""}>{r.sucursal}</td>
                   <td><TypeIndicator type={r.type} withLabel /></td>
-                  <td className={isDel ? "td-del" : ""}>{r.subcat ? <Chip>{subcatLabel(r.type, r.subcat)}</Chip> : <span className="prt-hint">—</span>}</td>
-                  <td className={isDel ? "td-del" : ""}>{r.provider}</td>
+                  <td
+                    className={(isDel ? "td-del" : "") + (editing && editing.id === r.id && editing.field === "subcat" ? " cell-edit" : "")}
+                    onClick={() => !isDel && r.type !== "electricidad" && startEdit(r.id, "subcat")}
+                    style={{ cursor: isDel || r.type === "electricidad" ? "default" : "pointer" }}
+                  >
+                    {editing && editing.id === r.id && editing.field === "subcat"
+                      ? <SelectEditCell
+                          defaultValue={r.subcat || ""}
+                          options={getSubcatsFor(state, r.type, r.sucursal).map(s => ({ value: s.id, label: s.label }))}
+                          onCommit={(v) => commitEdit(r.id, "subcat", v)}
+                          onCancel={() => setEditing(null)}
+                        />
+                      : (r.subcat ? <Chip>{subcatLabel(r.type, r.subcat)}</Chip> : <span className="prt-hint">—</span>)}
+                  </td>
+                  <td
+                    className={(isDel ? "td-del" : "") + (editing && editing.id === r.id && editing.field === "provider" ? " cell-edit" : "")}
+                    onClick={() => !isDel && startEdit(r.id, "provider")}
+                    style={{ cursor: isDel ? "default" : "pointer" }}
+                  >
+                    {editing && editing.id === r.id && editing.field === "provider"
+                      ? <SelectEditCell
+                          defaultValue={r.provider || ""}
+                          options={getProviderOptionsFor(state, r.sucursal, r.type)}
+                          allowFreeText
+                          onCommit={(v) => commitEdit(r.id, "provider", v)}
+                          onCancel={() => setEditing(null)}
+                        />
+                      : (r.provider || <span className="prt-hint">—</span>)}
+                  </td>
                   <td
                     className={"num" + (isDel ? " td-del" : "") + (editing && editing.id === r.id && editing.field === "cantidad" ? " cell-edit" : "")}
                     onClick={() => !isDel && startEdit(r.id, "cantidad")}
@@ -735,9 +805,10 @@ const RecentTable = () => {
                       : fmtCLP(r.costo)}
                   </td>
                   <td>
-                    {r.origen === "pdf" && <Chip size="sm" icon="picture_as_pdf">PDF</Chip>}
-                    {r.origen === "manual" && <Chip size="sm" icon="edit">Manual</Chip>}
-                    {r.origen === "sheets" && <Chip size="sm" icon="cloud">Importado</Chip>}
+                    {r.origen === "documento" && <Chip size="sm" icon="picture_as_pdf">Documento</Chip>}
+                    {r.origen === "manual"     && <Chip size="sm" icon="edit">Manual</Chip>}
+                    {r.origen === "foto"       && <Chip size="sm" icon="photo_camera">Foto</Chip>}
+                    {r.origen === "sheets"     && <Chip size="sm" icon="cloud">Importado</Chip>}
                   </td>
                   <td className={isDel ? "td-del" : ""}>
                     {r._driveLink ? (
@@ -767,6 +838,22 @@ const RecentTable = () => {
                         <Icon name="picture_as_pdf" size={14} />
                         <span style={{ font: "500 12px/1 var(--rl-font-body)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.factura}</span>
                       </span>
+                    ) : !isDel ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); triggerAttach(r); }}
+                        title="Adjuntar documento"
+                        style={{
+                          all: "unset", cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "4px 8px", borderRadius: 6,
+                          border: "1px dashed var(--rl-gray-300)",
+                          color: "var(--rl-gray-600)",
+                          font: "500 12px/1 var(--rl-font-body)",
+                        }}
+                      >
+                        <Icon name="cloud_upload" size={14} />
+                        <span>Adjuntar</span>
+                      </button>
                     ) : (
                       <span className="prt-hint">—</span>
                     )}
@@ -869,6 +956,43 @@ const RecentTable = () => {
         />
       )}
     </Card>
+  );
+};
+
+// Inline edit cell — select/dropdown variant para subcat/provider.
+// Si `allowFreeText` y options vacío, degrada a input texto.
+const SelectEditCell = ({ defaultValue, options, onCommit, onCancel, allowFreeText }) => {
+  const [v, setV] = React.useState(String(defaultValue || ""));
+  const opts = (options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
+  const isInOptions = opts.some(o => o.value === v);
+  // Si el valor actual no está en options (p. ej. proveedor custom legacy), lo agrega
+  // como primera opción para no perderlo.
+  const fullOpts = !isInOptions && v ? [{ value: v, label: v }, ...opts] : opts;
+  if (allowFreeText && fullOpts.length === 0) {
+    return (
+      <input
+        type="text"
+        value={v}
+        autoFocus
+        onChange={e => setV(e.target.value)}
+        onBlur={() => onCommit(v)}
+        onKeyDown={e => { if (e.key === "Enter") onCommit(v); if (e.key === "Escape") onCancel(); }}
+        style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 8px", height: 32, font: "500 13px/1 var(--rl-font-body)" }}
+      />
+    );
+  }
+  return (
+    <select
+      value={v}
+      autoFocus
+      onChange={e => { const nv = e.target.value; setV(nv); onCommit(nv); }}
+      onBlur={() => onCommit(v)}
+      onKeyDown={e => { if (e.key === "Escape") onCancel(); }}
+      style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 8px", height: 32, font: "500 13px/1 var(--rl-font-body)" }}
+    >
+      <option value="">—</option>
+      {fullOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
   );
 };
 

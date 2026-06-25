@@ -369,7 +369,7 @@ function reducer(state, action) {
           cantidad: parseFloat(r.cantidad),
           unit: TYPES[r.type].unit,
           costo: parseFloat(r.costo) || 0,
-          origen: "pdf",
+          origen: "documento",
           estado: "activa",
           // surface document filename for the detail-table "Documento" column
           factura: r.sourceFile || null,

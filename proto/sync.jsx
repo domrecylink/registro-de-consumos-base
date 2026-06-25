@@ -357,7 +357,7 @@ async function rcReadAllRecords() {
 
   ((data.Combustible || []).slice(1)).forEach(function (row, i) {
     const link = row[0], fecha = row[1], consumo = row[2], costo = row[3];
-    const sucursal = row[5], tipo = row[6], proveedor = row[7], estadoLbl = row[8];
+    const sucursal = row[5], tipo = row[6], proveedor = row[7], estadoLbl = row[8], origenLbl = row[9];
     if (!fecha && !consumo) return;
     const subcat = rcCombSubcat(tipo);
     records.push({
@@ -373,7 +373,7 @@ async function rcReadAllRecords() {
       cantidad: rcNum(consumo),
       unit: (subcat === "glp" || subcat === "gas-natural") ? "kg" : "L",
       costo: rcNum(costo),
-      origen: "sheets",
+      origen: rcOrigenValue(origenLbl),
       estado: rcEstadoValue(estadoLbl),
       _driveLink: link || "",
     });
@@ -381,7 +381,7 @@ async function rcReadAllRecords() {
 
   ((data.Electricidad || []).slice(1)).forEach(function (row, i) {
     const link = row[0], numCli = row[1], fecha = row[2], consumo = row[3];
-    const costo = row[4], sucursal = row[6], proveedor = row[8], estadoLbl = row[9];
+    const costo = row[4], sucursal = row[6], proveedor = row[8], estadoLbl = row[9], origenLbl = row[10];
     if (!fecha && !consumo) return;
     records.push({
       id: "elec-" + i,
@@ -396,7 +396,7 @@ async function rcReadAllRecords() {
       cantidad: rcNum(consumo),
       unit: "kWh",
       costo: rcNum(costo),
-      origen: "sheets",
+      origen: rcOrigenValue(origenLbl),
       estado: rcEstadoValue(estadoLbl),
       numeroCliente: numCli || "",
       _driveLink: link || "",
@@ -405,7 +405,7 @@ async function rcReadAllRecords() {
 
   ((data.Agua || []).slice(1)).forEach(function (row, i) {
     const link = row[0], numCli = row[1], fecha = row[2], consumo = row[3];
-    const costo = row[4], sucursal = row[6], proveedor = row[8], subcatLbl = row[9], estadoLbl = row[10];
+    const costo = row[4], sucursal = row[6], proveedor = row[8], subcatLbl = row[9], estadoLbl = row[10], origenLbl = row[11];
     if (!fecha && !consumo) return;
     records.push({
       id: "agua-" + i,
@@ -420,7 +420,7 @@ async function rcReadAllRecords() {
       cantidad: rcNum(consumo),
       unit: "m³",
       costo: rcNum(costo),
-      origen: "sheets",
+      origen: rcOrigenValue(origenLbl),
       estado: rcEstadoValue(estadoLbl),
       numeroCliente: numCli || "",
       _driveLink: link || "",
@@ -477,10 +477,28 @@ function rcEstadoValue(label) {
   return t === "eliminada" || t === "eliminado" ? "eliminada" : "activa";
 }
 
+// Mapea r.origen interno → etiqueta legible que persiste en la hoja.
+function rcOrigenLabel(origen) {
+  const o = String(origen || "").toLowerCase();
+  if (o === "manual") return "Manual";
+  if (o === "documento" || o === "pdf") return "Documento";
+  if (o === "foto") return "Foto";
+  if (o === "sheets") return "";
+  return "";
+}
+function rcOrigenValue(label) {
+  const t = String(label || "").trim().toLowerCase();
+  if (t === "manual") return "manual";
+  if (t === "documento" || t === "pdf") return "documento";
+  if (t === "foto") return "foto";
+  return "sheets";
+}
+
 function rowsByType(records) {
   const byType = { combustible: [], electricidad: [], agua: [] };
   for (const r of records) {
     const isManual = r.origen === "manual";
+    const origen = rcOrigenLabel(r.origen);
     if (r.type === "combustible") {
       byType.combustible.push([
         r._driveLink || "",
@@ -492,6 +510,7 @@ function rowsByType(records) {
         r.subcat ? subcatLabel(r.type, r.subcat) : "Petróleo Diesel",
         r.provider || "",
         rcEstadoLabel(r.estado),
+        origen,
       ]);
     } else if (r.type === "electricidad") {
       byType.electricidad.push([
@@ -505,6 +524,7 @@ function rowsByType(records) {
         "⚡Energía kWh",
         r.provider || "Enel",
         rcEstadoLabel(r.estado),
+        origen,
       ]);
     } else if (r.type === "agua") {
       byType.agua.push([
@@ -519,6 +539,7 @@ function rowsByType(records) {
         r.provider || "Aguas Andinas",
         r.subcat ? subcatLabel("agua", r.subcat) : "",
         rcEstadoLabel(r.estado),
+        origen,
       ]);
     }
   }
@@ -658,17 +679,17 @@ function rcFotoToConsumptionRow(fotoRow, patch) {
     : (patch.subcat || "");
   if (tipo === "combustible") {
     return { sheet: "Combustible", values: [[
-      link, fecha, consumo, costo, empresa, sucursal, subLabel, proveedor, "activa",
+      link, fecha, consumo, costo, empresa, sucursal, subLabel, proveedor, "activa", "Foto",
     ]]};
   }
   if (tipo === "electricidad") {
     return { sheet: "Electricidad", values: [[
-      link, "", fecha, consumo, costo, empresa, sucursal, "Electricidad", proveedor, "activa",
+      link, "", fecha, consumo, costo, empresa, sucursal, "Electricidad", proveedor, "activa", "Foto",
     ]]};
   }
   if (tipo === "agua") {
     return { sheet: "Agua", values: [[
-      link, "", fecha, consumo, costo, empresa, sucursal, "Agua", proveedor, subLabel, "activa",
+      link, "", fecha, consumo, costo, empresa, sucursal, "Agua", proveedor, subLabel, "activa", "Foto",
     ]]};
   }
   return null;
@@ -724,6 +745,32 @@ async function rcCompleteFoto({ fileId, rowIndex, patch, fotoRow }) {
 }
 
 // ----- Confirm handler ----------------------------------------------------
+
+// Adjunta un documento a un registro existente del dashboard. Sube el archivo
+// a la carpeta MANUAL_FACTURAS y, si el registro proviene de Sheets, también
+// actualiza la celda Link. Devuelve { id, link } del archivo en Drive.
+async function rcAttachDocumentToRecord(rec, file) {
+  if (!rcEndpointConfigured()) throw new Error("Backend no configurado.");
+  const folderId = RC_CONFIG.FOLDERS.MANUAL_FACTURAS;
+  if (!folderId) throw new Error("MANUAL_FACTURAS no configurado en sync.jsx");
+  const base64 = await rcFileToBase64(file);
+  const up = await rcApiPost({
+    action: "upload",
+    name: file.name,
+    mimeType: file.type || "application/octet-stream",
+    base64,
+    folderId,
+  });
+  const target = rcResolveSheetCell(rec.id, "link");
+  if (target) {
+    try {
+      await rcApiPost({ action: "update", sheet: target.sheet, row: target.row, col: target.col, value: up.link });
+    } catch (e) {
+      console.warn("[rc-sync] attach: update link cell failed", e);
+    }
+  }
+  return up;
+}
 
 async function rcHandleConfirm(ev) {
   const detail = ev.detail || {};
@@ -864,9 +911,9 @@ function rcResolveSheetCell(id, field) {
   const kind = m[1];
   const row = parseInt(m[2], 10) + 2;
   const COLS = {
-    comb: { cantidad: 3, costo: 4, estado: 9,  sheet: RC_CONFIG.SHEETS.COMBUSTIBLE },
-    elec: { cantidad: 4, costo: 5, estado: 10, sheet: RC_CONFIG.SHEETS.ELECTRICIDAD },
-    agua: { cantidad: 4, costo: 5, estado: 11, sheet: RC_CONFIG.SHEETS.AGUA },
+    comb: { link: 1, cantidad: 3, costo: 4, subcat: 7, provider: 8, estado: 9,  sheet: RC_CONFIG.SHEETS.COMBUSTIBLE },
+    elec: { link: 1, cantidad: 4, costo: 5,             provider: 9, estado: 10, sheet: RC_CONFIG.SHEETS.ELECTRICIDAD },
+    agua: { link: 1, cantidad: 4, costo: 5, subcat: 10, provider: 9, estado: 11, sheet: RC_CONFIG.SHEETS.AGUA },
   }[kind];
   if (!COLS || !COLS[field]) return null;
   return { sheet: COLS.sheet, row, col: COLS[field] };
@@ -1114,4 +1161,5 @@ Object.assign(window, {
   rcReadEmissions, rcWriteEmissions, rcFlattenEmissions, rcUnflattenEmissions,
   rcUploadFoto, rcReadFotos, rcCompleteFoto,
   rcReadFotoNotifEmails, rcWriteFotoNotifEmails, rcNotifyFotoPending,
+  rcAttachDocumentToRecord,
 });
