@@ -598,10 +598,45 @@ const RecentTable = () => {
   const [editing, setEditing] = React.useState(null); // { id, field }
   const [confirmModal, setConfirmModal] = React.useState(null); // { action, rec }
   const allFiltered = selectFilteredRecords(state);
-  const sorted = React.useMemo(
-    () => [...allFiltered].sort((a, b) => b.date.localeCompare(a.date)),
-    [allFiltered]
-  );
+
+  // Ordenamiento click-to-sort. Defaults: por fecha descendente.
+  const [sortKey, setSortKey] = React.useState("date");
+  const [sortDir, setSortDir] = React.useState("desc");
+  const NUMERIC_KEYS = new Set(["cantidad", "costo"]);
+  const DATE_KEYS = new Set(["date"]);
+  const toggleSort = (key) => {
+    if (key === sortKey) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      // Numéricos y fecha → arrancan desc (más alto/reciente primero).
+      setSortDir((NUMERIC_KEYS.has(key) || DATE_KEYS.has(key)) ? "desc" : "asc");
+    }
+  };
+  const sortValueOf = (r) => {
+    switch (sortKey) {
+      case "date":     return r.date || "";
+      case "sucursal": return r.sucursal || "";
+      case "type":     return TYPES[r.type]?.label || r.type || "";
+      case "subcat":   return r.subcat ? (subcatLabel(r.type, r.subcat) || r.subcat) : "";
+      case "provider": return r.provider || "";
+      case "cantidad": return Number(r.cantidad) || 0;
+      case "costo":    return Number(r.costo) || 0;
+      case "origen":   return r.origen || "";
+      case "estado":   return r.estado || "";
+      default:         return "";
+    }
+  };
+  const sorted = React.useMemo(() => {
+    const arr = [...allFiltered];
+    const mult = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      const va = sortValueOf(a), vb = sortValueOf(b);
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * mult;
+      return String(va).localeCompare(String(vb), "es", { sensitivity: "base" }) * mult;
+    });
+    return arr;
+  }, [allFiltered, sortKey, sortDir]);
   const PAGE_SIZE = 10;
   const [page, setPage] = React.useState(0);
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -732,16 +767,16 @@ const RecentTable = () => {
         <table className="prt-table">
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Sucursal</th>
-              <th>Tipo</th>
-              <th>Subcategoría</th>
-              <th>Proveedor</th>
-              <th className="num">Cantidad</th>
-              <th className="num">Costo (CLP)</th>
-              <th>Origen</th>
+              <SortableTh keyId="date"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Fecha</SortableTh>
+              <SortableTh keyId="sucursal" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Sucursal</SortableTh>
+              <SortableTh keyId="type"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Tipo</SortableTh>
+              <SortableTh keyId="subcat"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Subcategoría</SortableTh>
+              <SortableTh keyId="provider" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Proveedor</SortableTh>
+              <SortableTh keyId="cantidad" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} num>Cantidad</SortableTh>
+              <SortableTh keyId="costo"    sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} num>Costo (CLP)</SortableTh>
+              <SortableTh keyId="origen"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Origen</SortableTh>
               <th>Documento</th>
-              <th>Estado</th>
+              <SortableTh keyId="estado"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Estado</SortableTh>
               <th style={{ width: 48 }}></th>
             </tr>
           </thead>
@@ -956,6 +991,27 @@ const RecentTable = () => {
         />
       )}
     </Card>
+  );
+};
+
+// Encabezado clickeable para ordenar por columna. Muestra una flecha
+// cuando la columna está activa; ícono neutro al hover.
+const SortableTh = ({ keyId, sortKey, sortDir, onClick, num, children }) => {
+  const active = sortKey === keyId;
+  return (
+    <th
+      className={num ? "num" : ""}
+      onClick={() => onClick(keyId)}
+      title={"Ordenar por " + (typeof children === "string" ? children.toLowerCase() : "esta columna")}
+      style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+        {children}
+        {active
+          ? <Icon name={sortDir === "asc" ? "arrow_upward" : "arrow_downward"} size={12} style={{ opacity: .85 }} />
+          : <Icon name="unfold_more" size={12} style={{ opacity: .25 }} />}
+      </span>
+    </th>
   );
 };
 

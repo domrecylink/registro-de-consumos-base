@@ -8,6 +8,9 @@ const ICON_PATHS = {
   add:         <g><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g>,
   arrow_back:    <g><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></g>,
   arrow_forward: <g><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></g>,
+  arrow_upward:   <g><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></g>,
+  arrow_downward: <g><line x1="12" y1="5"  x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></g>,
+  unfold_more:    <g><polyline points="8 7 12 3 16 7"/><polyline points="16 17 12 21 8 17"/></g>,
   refresh:     <g><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></g>,
   open_in_new: <g><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></g>,
 
