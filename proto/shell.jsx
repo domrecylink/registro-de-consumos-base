@@ -104,6 +104,98 @@ const Shell = () => {
       </div>
       <ToastHost />
       <BuildBadge />
+      <VersionWatcher />
+    </div>
+  );
+};
+
+// ----- Detección de nueva versión deployada -------------------------------
+// Lee `version.json` al arrancar (la guarda en bootRef), y la re-consulta cada
+// 60s + cuando la pestaña vuelve a estar visible. Si el valor remoto cambia,
+// muestra un banner no intrusivo. Cerrar el banner sólo lo oculta hasta el
+// siguiente chequeo — si sigue desactualizado, vuelve a aparecer.
+const VERSION_CHECK_MS = 60_000;
+
+const VersionWatcher = () => {
+  const bootRef = React.useRef(null);
+  const [latest, setLatest] = React.useState(null);
+  const [show, setShow] = React.useState(false);
+
+  const check = React.useCallback(async () => {
+    try {
+      const r = await fetch("./version.json?_=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const j = await r.json();
+      const v = j && (j.version || j.sha || j.ts);
+      if (!v) return;
+      if (bootRef.current == null) {
+        bootRef.current = v;
+        setLatest(v);
+        return;
+      }
+      setLatest(v);
+      if (v !== bootRef.current) setShow(true);
+    } catch (e) { /* offline / 404 — ignoramos */ }
+  }, []);
+
+  React.useEffect(() => {
+    check();
+    const id = setInterval(check, VERSION_CHECK_MS);
+    const onVis = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [check]);
+
+  if (!show) return null;
+  return (
+    <div
+      role="status"
+      style={{
+        position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)",
+        zIndex: 10000, maxWidth: "min(720px, calc(100vw - 24px))",
+        background: "var(--rl-primary-900, #0B3D5C)", color: "#fff",
+        padding: "12px 14px 12px 16px", borderRadius: 12,
+        boxShadow: "0 12px 32px rgba(0,0,0,.28)",
+        display: "flex", alignItems: "center", gap: 12,
+        font: "500 13px/1.45 var(--rl-font-body)",
+      }}
+    >
+      <span style={{
+        width: 28, height: 28, borderRadius: 999,
+        background: "rgba(255,255,255,0.16)",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0,
+      }}>
+        <Icon name="refresh" size={16} />
+      </span>
+      <span style={{ flex: 1 }}>
+        <strong style={{ fontWeight: 700 }}>Hay una nueva versión disponible.</strong>{" "}
+        Es importante actualizar la página para evitar errores en el uso de la app.
+      </span>
+      <button
+        onClick={() => { try { window.location.reload(true); } catch (e) { window.location.reload(); } }}
+        style={{
+          all: "unset", cursor: "pointer",
+          background: "#fff", color: "var(--rl-primary-900, #0B3D5C)",
+          padding: "8px 14px", borderRadius: 8,
+          font: "700 12.5px/1 var(--rl-font-display)",
+          whiteSpace: "nowrap",
+        }}
+      >Actualizar ahora</button>
+      <button
+        onClick={() => setShow(false)}
+        aria-label="Cerrar"
+        title="Cerrar (volverá a aparecer si sigue desactualizado)"
+        style={{
+          all: "unset", cursor: "pointer",
+          width: 26, height: 26, borderRadius: 6,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          opacity: 0.7,
+        }}
+      ><Icon name="close" size={16} /></button>
     </div>
   );
 };
