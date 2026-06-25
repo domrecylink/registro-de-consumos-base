@@ -173,7 +173,7 @@ const EntryCard = ({ entry, index, total, sucursal, errors, onRemove }) => {
               : `Unidad: ${entryUnit}`
             }
           >
-            <Input
+            <NumericInput
               value={entry.cantidad}
               onChange={v => setField("cantidad", v)}
               placeholder="0"
@@ -182,12 +182,13 @@ const EntryCard = ({ entry, index, total, sucursal, errors, onRemove }) => {
             />
           </Field>
           <Field label="Costo total (opcional)" error={ee.costo}>
-            <Input
+            <NumericInput
               value={entry.costo}
               onChange={v => setField("costo", v)}
               placeholder="0"
               suffix="CLP"
               error={!!ee.costo}
+              allowDecimal={false}
             />
           </Field>
         </div>

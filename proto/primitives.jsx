@@ -53,6 +53,89 @@ const Input = React.forwardRef(({ value, onChange, placeholder, suffix, error, t
   );
 });
 
+// ---- NumericInput ----
+// Input numérico para cantidad/costo en formato chileno:
+//   - Bloquea la tecla "." (los puntos los pone el componente).
+//   - Acepta una coma como separador decimal.
+//   - Mientras el usuario escribe, no formatea (evita saltos de cursor).
+//   - Al perder foco, normaliza el valor y lo emite como NÚMERO (no string).
+//   - Display sin foco: thousand separator "." + decimal ",".
+// Props: value (number | "" | string), onChange(number | ""), placeholder,
+//        suffix, error, autoFocus, onBlur, allowDecimal (default true).
+const NumericInput = React.forwardRef(({ value, onChange, placeholder, suffix, error, autoFocus, onBlur, style, allowDecimal = true }, ref) => {
+  const [focused, setFocused] = React.useState(false);
+  const [raw, setRaw] = React.useState("");
+
+  // Format a numeric value to "1.234,56" — sin foco.
+  const formatDisplay = (n) => {
+    if (n === "" || n == null) return "";
+    const num = typeof n === "number" ? n : parseFloat(String(n).replace(/\./g, "").replace(",", "."));
+    if (isNaN(num)) return "";
+    return num.toLocaleString("es-CL", { maximumFractionDigits: 6 });
+  };
+  // Parse user-typed "1234,5" → 1234.5
+  const parseUserInput = (s) => {
+    if (s == null) return "";
+    const t = String(s).trim();
+    if (!t || t === "-" || t === ",") return "";
+    const cleaned = t.replace(/\./g, "").replace(",", ".");
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? "" : n;
+  };
+
+  const display = focused ? raw : formatDisplay(value);
+
+  const onChangeRaw = (e) => {
+    let v = e.target.value;
+    // Strip puntos (el usuario no debe escribirlos).
+    v = v.replace(/\./g, "");
+    // Filtra a dígitos, coma y signo menos.
+    v = allowDecimal ? v.replace(/[^0-9,-]/g, "") : v.replace(/[^0-9-]/g, "");
+    // Solo una coma.
+    const firstComma = v.indexOf(",");
+    if (firstComma !== -1) v = v.slice(0, firstComma + 1) + v.slice(firstComma + 1).replace(/,/g, "");
+    // Solo un signo menos al inicio.
+    if (v.indexOf("-") > 0) v = v.replace(/-/g, "");
+    setRaw(v);
+    onChange && onChange(parseUserInput(v));
+  };
+  const onKeyDownGuard = (e) => {
+    if (e.key === ".") { e.preventDefault(); return; }
+    // Bloquea coma cuando no se permite decimal.
+    if (!allowDecimal && e.key === ",") { e.preventDefault(); return; }
+  };
+  const handleFocus = () => {
+    setFocused(true);
+    if (value === "" || value == null) { setRaw(""); return; }
+    const num = typeof value === "number" ? value : parseFloat(String(value).replace(/\./g, "").replace(",", "."));
+    setRaw(isNaN(num) ? "" : String(num).replace(".", ","));
+  };
+  const handleBlur = (e) => {
+    setFocused(false);
+    if (onBlur) onBlur(e);
+  };
+
+  return (
+    <div className={"prt-input-wrap" + (suffix ? " has-suffix" : "")}>
+      <input
+        ref={ref}
+        type="text"
+        inputMode={allowDecimal ? "decimal" : "numeric"}
+        className={"prt-input" + (error ? " error" : "")}
+        value={display}
+        onChange={onChangeRaw}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={onKeyDownGuard}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        style={style}
+      />
+      {suffix && <span className="prt-suffix">{suffix}</span>}
+    </div>
+  );
+});
+
 // Hoy en ISO local (YYYY-MM-DD) y mes actual (YYYY-MM). Para cap de inputs
 // date/month que no deben permitir futuro.
 function todayISO() {
@@ -188,7 +271,7 @@ const ToastHost = () => {
 };
 
 Object.assign(window, {
-  Btn, Field, Input, Select, Chip, TypeIndicator,
+  Btn, Field, Input, NumericInput, Select, Chip, TypeIndicator,
   Card, SectionHead, Steps, EmptyState, ToastHost,
   todayISO, currentMonthISO,
 });
