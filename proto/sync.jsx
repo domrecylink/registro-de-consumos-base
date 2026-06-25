@@ -26,22 +26,27 @@ const RC_CONFIG = {
   },
 
   FOLDERS: {
-    // 👉 IDs de carpetas Drive de Ando (los sacas de la URL al abrir cada carpeta).
-    ENEL_POR_PROCESAR:  "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz",
-    ENEL_PROCESADOS:    "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9",
-    AGUAS_POR_PROCESAR: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE",
-    AGUAS_PROCESADOS:   "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R",
-    // Flujo "Tomar foto" — usuario captura imagen, archivo va aquí;
-    // al completar datos en app o Sheet, archivo se mueve a procesados.
+    // Flujo "Tomar foto".
     FOTOS_POR_COMPLETAR:"1WbBQXZBKixe-5nd54G07xOsdo0P6Qs_k",
     FOTOS_PROCESADOS:   "13oru7kNnvMW5S8jV_sKPQyMvt80luFrP",
-    // Folder where manual-entry facturas/boletas land. Leave empty to skip the upload
-    // (the filename will still be captured locally on the record).
+    // Facturas adjuntas en registro manual.
     MANUAL_FACTURAS:    "1_V5cHpEBJItL0yr-Mi2Oz5IqMu5hkIAH",
-    // Optional dedicated folder for documents uploaded via "Subir documento" with
-    // providers other than Enel/Aguas (e.g. Iconstruye). Falls back to MANUAL_FACTURAS
-    // when empty so a single config covers both flows.
+    // Fallback para "Subir documento" cuando el proveedor no tiene folder propio.
     UPLOAD_FACTURAS:    "",
+  },
+  // Folders dedicados por proveedor para "Subir documento". Cada entrada:
+  //   { porProcesar: "<id>", procesados: "<id>" }
+  // Si una entrada falta o tiene IDs vacíos, ese proveedor usa MANUAL_FACTURAS /
+  // UPLOAD_FACTURAS como fallback y NO mueve a "procesados".
+  PROVIDER_FOLDERS: {
+    "enel":            { porProcesar: "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz", procesados: "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9" },
+    "cge":             { porProcesar: "",                                   procesados: "" },
+    "aguas-andinas":   { porProcesar: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE", procesados: "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R" },
+    "aguas-del-valle": { porProcesar: "",                                   procesados: "" },
+    "esval":           { porProcesar: "",                                   procesados: "" },
+    "iconstruye-pet":  { porProcesar: "",                                   procesados: "" },
+    "copec":           { porProcesar: "",                                   procesados: "" },
+    "shell":           { porProcesar: "",                                   procesados: "" },
   },
 
   EMPRESA: "Ando",
@@ -787,16 +792,14 @@ async function rcHandleConfirm(ev) {
     // 1) Subir cada archivo único a la carpeta Drive correspondiente
     const uploads = {};
     if (source === "upload" && files && files.length) {
-      const providerName = (provider && provider.name) || "";
-      const isEnel  = /Enel/i.test(providerName);
-      const isAguas = /Aguas/i.test(providerName);
-      const folderOrigen = isEnel ? RC_CONFIG.FOLDERS.ENEL_POR_PROCESAR
-                        : isAguas ? RC_CONFIG.FOLDERS.AGUAS_POR_PROCESAR
-                        : (RC_CONFIG.FOLDERS.UPLOAD_FACTURAS || RC_CONFIG.FOLDERS.MANUAL_FACTURAS || null);
-      // Only Enel/Aguas have a "Procesados" sibling; generic uploads stay in their source folder.
-      const folderDestino = isEnel ? RC_CONFIG.FOLDERS.ENEL_PROCESADOS
-                         : isAguas ? RC_CONFIG.FOLDERS.AGUAS_PROCESADOS
-                         : null;
+      const providerId = (provider && provider.id) || "";
+      const pf = (RC_CONFIG.PROVIDER_FOLDERS && RC_CONFIG.PROVIDER_FOLDERS[providerId]) || null;
+      const folderOrigen = (pf && pf.porProcesar)
+        || RC_CONFIG.FOLDERS.UPLOAD_FACTURAS
+        || RC_CONFIG.FOLDERS.MANUAL_FACTURAS
+        || null;
+      // Sólo movemos a "procesados" si el proveedor tiene su par configurado.
+      const folderDestino = (pf && pf.procesados) || null;
       if (folderOrigen) {
         for (const f of files) {
           if (!f.file) continue;
