@@ -12,10 +12,23 @@ const OB_SISTEMAS = [
 ];
 
 const OB_PROVEEDORES = {
-  electricidad: ["Enel", "CGE", "Saesa", "Generación propia"],
-  combustible: ["Copec", "Shell", "Petrobras", "Iconstruye Petróleo"],
-  agua: ["Aguas Andinas", "Esval", "Essbio"],
-  refrigerantes: ["Chemours", "Honeywell", "Daikin"],
+  electricidad: [
+    "Enel", "CGE", "Saesa", "Frontel", "Chilquinta", "Conafe", "Litoral",
+    "Edelaysén", "Edelmag", "Cooperativa Eléctrica",
+    "Generación propia",
+  ],
+  combustible: [
+    "Copec", "Shell", "Petrobras", "Esmax", "Enex", "YPF",
+    "Iconstruye Petróleo",
+    "Lipigas", "Abastible", "Gasco",
+    "Metrogas", "Gasvalpo",
+  ],
+  agua: [
+    "Aguas Andinas", "Aguas Cordillera", "Aguas del Valle", "Aguas del Altiplano",
+    "Aguas Antofagasta", "Aguas Magallanes", "Aguas Chañar", "Aguas Patagonia",
+    "Esval", "Essbio", "Essal", "Nuevosur", "Smapa",
+  ],
+  refrigerantes: ["Chemours", "Honeywell", "Daikin", "Linde", "Arkema", "Koura"],
 };
 
 const OB_TIPOS_COMBUSTIBLE = [
