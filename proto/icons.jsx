@@ -64,6 +64,9 @@ const ICON_PATHS = {
   toggle_off:    <g><rect x="1" y="6" width="22" height="12" rx="6" ry="6"/><circle cx="7" cy="12" r="3"/></g>,
   cloud:         <g><path d="M17.5 19a4.5 4.5 0 1 0-1.5-8.75A6 6 0 1 0 6 14h11.5z"/></g>,
   expand_more:   <polyline points="6 9 12 15 18 9"/>,
+  chevron_left:  <polyline points="15 18 9 12 15 6"/>,
+  chevron_right: <polyline points="9 18 15 12 9 6"/>,
+  calendar_today: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></g>,
   expand_less:   <polyline points="18 15 12 9 6 15"/>,
 
   // Impacto ambiental

@@ -140,10 +140,16 @@ const EntryCard = ({ entry, index, total, sucursal, errors, onRemove }) => {
         {/* Tipo + Subcat */}
         <div style={{ display: "grid", gridTemplateColumns: typeRequiresSubcat ? "1fr 1fr" : "1fr", gap: 16 }}>
           <Field label="Tipo de consumo" required error={ee.type}>
-            <Select
+            <IconSelect
               value={entry.type}
               onChange={v => setField("type", v)}
-              options={Object.values(TYPES).map(tt => ({ value: tt.id, label: `${tt.label} (${tt.unit})` }))}
+              options={Object.values(TYPES).map(tt => ({
+                value: tt.id,
+                label: `${tt.label} (${tt.unit})`,
+                icon: tt.icon,
+                iconBg: tt.bg,
+                iconColor: tt.color,
+              }))}
               placeholder="Elige un tipo…"
               error={!!ee.type}
             />
@@ -274,7 +280,7 @@ const ManualForm = () => {
         <div className="prt-eyebrow" style={{ marginBottom: 12 }}>Datos compartidos del lote</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Field label="Fecha del consumo" required error={errs.date}>
-            <Input type="date" value={d.date} onChange={v => setShared("date", v)} max={todayISO()} />
+            <DatePicker value={d.date} onChange={v => setShared("date", v)} max={todayISO()} error={!!errs.date} />
           </Field>
           <Field label="Sucursal" required error={errs.sucursal}>
             <Select
