@@ -13,7 +13,7 @@ const OB_SISTEMAS = [
 
 const OB_PROVEEDORES = {
   electricidad: [
-    "CGE", "Enel Distribución", "Chilquinta", "Grupo Saesa", "Edelmag",
+    "CGE", "Enel", "Chilquinta", "Grupo Saesa", "Edelmag",
   ],
   combustible: [
     "Copec", "Shell", "Petrobras", "Esmax", "Enex", "YPF",

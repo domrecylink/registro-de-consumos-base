@@ -27,7 +27,7 @@ const INITIAL_SUBCATS = {
 };
 
 const PROVIDERS = {
-  electricidad: ["CGE", "Enel Distribución", "Chilquinta", "Grupo Saesa", "Edelmag"],
+  electricidad: ["CGE", "Enel", "Chilquinta", "Grupo Saesa", "Edelmag"],
   combustible:  ["Copec", "Shell", "Petrobras", "Esmax", "Enex", "YPF", "Iconstruye Petróleo", "Lipigas", "Abastible", "Gasco", "Metrogas", "Gasvalpo"],
   agua:         ["Aguas Andinas", "SMAPA", "Esval", "Essbio", "Aguas del Altiplano", "Aguas Antofagasta", "Aguas del Valle", "Aguas Araucanía", "Suralis", "Aguas Magallanes"],
 };
