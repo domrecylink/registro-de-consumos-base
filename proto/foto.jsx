@@ -257,7 +257,7 @@ const FotoColaSection = () => {
           {r.sucursal || "—"} {r.tipo && <span style={{ color: "var(--rl-gray-600)" }}> · {tipoLabel[r.tipo] || r.tipo}</span>}
         </div>
         <div className="rc-foto-row-sub">
-          {r.periodo || "—"} · {r.fechaSubida ? fmtDate(String(r.fechaSubida).slice(0, 10)) : "—"}
+          {r.periodo || "—"} · {r.fechaSubida ? fmtDateTime(r.fechaSubida) : "—"}
           {r.link && (<> · <a href={r.link} target="_blank" rel="noopener" className="prt-link">Foto</a></>)}
         </div>
       </div>

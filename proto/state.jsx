@@ -722,6 +722,18 @@ function fmtDate(iso) {
   const [y,m,d] = iso.split("-");
   return `${d}/${m}/${y.slice(2)}`;
 }
+// Format an ISO-ish datetime ("2026-06-25T09:35:12.345Z" o "2026-06-25 09:35:12")
+// to "DD/MM/YY HH:mm" en horario local. Devuelve "—" si no parsea.
+function fmtDateTime(s) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) {
+    const str = String(s).trim();
+    return str ? str : "—";
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function monthLabelShort(mk) {
   const [y, m] = mk.split("-");
   const names = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -951,7 +963,7 @@ Object.assign(window, {
   SCOPES, EMISSION_FACTOR_CATALOG, REFRIGERANTES_CATALOG,
   months, nextId,
   CURRENT_MONTH_KEY, PREV_MONTH_KEY,
-  fmtCLP, fmtNum, fmtTon, fmtDate, monthLabelShort,
+  fmtCLP, fmtNum, fmtTon, fmtDate, fmtDateTime, monthLabelShort,
   periodToMonthKeys, periodLabel, monthKeysInRange, parseCustomPeriod, subcatLabel, activeSucNames, getSubcatsFor,
   combustibleSubcatFromConfig, getEntryUnit,
   getConfiguredProvider, getProviderOptionsFor,
