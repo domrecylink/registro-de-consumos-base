@@ -7,8 +7,8 @@ const PROVIDER_TEMPLATES = [
   { id: "aguas-del-valle", name: "Aguas del Valle",      type: "agua",         initials: "AV", examples: "PDF mensual" },
   { id: "esval",           name: "Esval",                type: "agua",         initials: "E",  examples: "PDF mensual" },
   { id: "iconstruye-pet",  name: "Iconstruye Petróleo",  type: "combustible",  initials: "IP", examples: "PDF multi-sucursal" },
-  { id: "copec",           name: "Copec",                type: "combustible",  initials: "C",  examples: "PDF · Excel" },
-  { id: "shell",           name: "Shell",                type: "combustible",  initials: "S",  examples: "PDF mensual" },
+  { id: "copec",           name: "Copec",                type: "combustible",  initials: "C",  examples: "PDF · Excel",   hidden: true },
+  { id: "shell",           name: "Shell",                type: "combustible",  initials: "S",  examples: "PDF mensual",   hidden: true },
   { id: "generic",         name: "Otro proveedor",       type: "any",          initials: "?",  examples: "Lo intentamos extraer; algunos campos pueden quedar vacíos" },
 ];
 
@@ -32,7 +32,7 @@ const UploadStep1 = () => {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-        {PROVIDER_TEMPLATES.map(p => {
+        {PROVIDER_TEMPLATES.filter(p => !p.hidden).map(p => {
           const t = p.type === "any" ? null : TYPES[p.type];
           return (
             <button
