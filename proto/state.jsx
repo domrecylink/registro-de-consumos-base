@@ -186,12 +186,8 @@ function emptyEntry() {
 }
 
 function emptyDraft() {
-  const today = new Date();
-  const iso = today.getFullYear() + "-" +
-              String(today.getMonth() + 1).padStart(2, "0") + "-" +
-              String(today.getDate()).padStart(2, "0");
   return {
-    date: iso,
+    date: "",
     sucursal: "",
     entries: [emptyEntry()],
   };
