@@ -9,7 +9,7 @@ const PROVIDER_TEMPLATES = [
   { id: "iconstruye-pet",  name: "Iconstruye Petróleo",  type: "combustible",  initials: "IP", examples: "PDF multi-sucursal" },
   { id: "copec",           name: "Copec",                type: "combustible",  initials: "C",  examples: "PDF · Excel",   hidden: true },
   { id: "shell",           name: "Shell",                type: "combustible",  initials: "S",  examples: "PDF mensual",   hidden: true },
-  { id: "generic",         name: "Otro proveedor",       type: "any",          initials: "?",  examples: "Lo intentamos extraer; algunos campos pueden quedar vacíos" },
+  { id: "generic",         name: "Otro proveedor",       type: "any",          initials: "?",  examples: "Lo intentamos extraer; algunos campos pueden quedar vacíos", hidden: true },
 ];
 
 // =========================================================
