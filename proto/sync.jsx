@@ -40,7 +40,7 @@ const RC_CONFIG = {
   // UPLOAD_FACTURAS como fallback y NO mueve a "procesados".
   PROVIDER_FOLDERS: {
     "enel":            { porProcesar: "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz", procesados: "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9" },
-    "cge":             { porProcesar: "",                                   procesados: "" },
+    "cge":             { porProcesar: "1kYVBaLrGGV5Gy6i_C-BeibmzdGPwoa2i", procesados: "1FHKg06YqdWuyFYqUwIfo5wpcA3NBYY4G" },
     "aguas-andinas":   { porProcesar: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE", procesados: "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R" },
     "aguas-del-valle": { porProcesar: "",                                   procesados: "" },
     "esval":           { porProcesar: "",                                   procesados: "" },
