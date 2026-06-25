@@ -548,17 +548,27 @@ const DashFilterBar = () => {
   const setRange = (start, end) => set("period", `custom:${start}:${end}`);
   return (
     <div className="prt-row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-      <select className="prt-select" style={{ width: 220 }} value={f.sucursal} onChange={e => set("sucursal", e.target.value)}>
-        <option value="all">Todas las sucursales ({activeSucNames(state).length})</option>
-        {activeSucNames(state).map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <select className="prt-select" style={{ width: 200 }} value={selValue} onChange={e => onPeriodChange(e.target.value)}>
-        <option value="12m">Últimos 12 meses</option>
-        <option value="6m">Últimos 6 meses</option>
-        <option value="3m">Últimos 3 meses</option>
-        <option value="1m">{periodLabel("1m")}</option>
-        <option value="custom">Personalizado…</option>
-      </select>
+      <Select
+        style={{ width: 220 }}
+        value={f.sucursal}
+        onChange={(v) => set("sucursal", v)}
+        options={[
+          { value: "all", label: `Todas las sucursales (${activeSucNames(state).length})` },
+          ...activeSucNames(state).map(s => ({ value: s, label: s })),
+        ]}
+      />
+      <Select
+        style={{ width: 200 }}
+        value={selValue}
+        onChange={(v) => onPeriodChange(v)}
+        options={[
+          { value: "12m", label: "Últimos 12 meses" },
+          { value: "6m",  label: "Últimos 6 meses" },
+          { value: "3m",  label: "Últimos 3 meses" },
+          { value: "1m",  label: periodLabel("1m") },
+          { value: "custom", label: "Personalizado…" },
+        ]}
+      />
       {isCustom && (
         <div className="prt-row" style={{ gap: 6, alignItems: "center" }}>
           <input
@@ -738,14 +748,17 @@ const RecentTable = () => {
           <div className="prt-hint" style={{ marginTop: 2 }}>Edita una celda haciendo clic. Los cambios se guardan al instante (con opción de deshacer).</div>
         </div>
         <div className="prt-row" style={{ gap: 8 }}>
-          <select className="prt-select" style={{ width: 160, height: 32, fontSize: 13 }}
+          <Select
+            size="sm"
+            style={{ width: 160 }}
             value={state.dashFilters.estado}
-            onChange={e => dispatch({ type: "DASH/SET_FILTER", key: "estado", value: e.target.value })}
-          >
-            <option value="activa">Solo activas</option>
-            <option value="eliminada">Solo eliminadas</option>
-            <option value="all">Todas</option>
-          </select>
+            onChange={(v) => dispatch({ type: "DASH/SET_FILTER", key: "estado", value: v })}
+            options={[
+              { value: "activa", label: "Solo activas" },
+              { value: "eliminada", label: "Solo eliminadas" },
+              { value: "all", label: "Todas" },
+            ]}
+          />
           <Chip size="sm">{rangeStart}–{rangeEnd} de {sorted.length}</Chip>
           <Btn size="sm" icon="open_in_new">Ver todo</Btn>
         </div>
@@ -1015,40 +1028,39 @@ const SortableTh = ({ keyId, sortKey, sortDir, onClick, num, children }) => {
   );
 };
 
-// Inline edit cell — select/dropdown variant para subcat/provider.
-// Si `allowFreeText` y options vacío, degrada a input texto.
+// Inline edit cell — usa el Select unificado del sistema en modo autoFocus.
+// Si `allowFreeText` y no hay options, degrada a input de texto libre.
 const SelectEditCell = ({ defaultValue, options, onCommit, onCancel, allowFreeText }) => {
-  const [v, setV] = React.useState(String(defaultValue || ""));
+  const v = String(defaultValue || "");
   const opts = (options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
   const isInOptions = opts.some(o => o.value === v);
-  // Si el valor actual no está en options (p. ej. proveedor custom legacy), lo agrega
-  // como primera opción para no perderlo.
+  // Preserva el valor actual aunque no esté en opciones (proveedor custom legacy).
   const fullOpts = !isInOptions && v ? [{ value: v, label: v }, ...opts] : opts;
   if (allowFreeText && fullOpts.length === 0) {
     return (
       <input
         type="text"
-        value={v}
+        defaultValue={v}
         autoFocus
-        onChange={e => setV(e.target.value)}
-        onBlur={() => onCommit(v)}
-        onKeyDown={e => { if (e.key === "Enter") onCommit(v); if (e.key === "Escape") onCancel(); }}
+        onBlur={(e) => onCommit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit(e.currentTarget.value);
+          if (e.key === "Escape") onCancel();
+        }}
         style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 8px", height: 32, font: "500 13px/1 var(--rl-font-body)" }}
       />
     );
   }
   return (
-    <select
-      value={v}
+    <Select
+      size="sm"
       autoFocus
-      onChange={e => { const nv = e.target.value; setV(nv); onCommit(nv); }}
-      onBlur={() => onCommit(v)}
-      onKeyDown={e => { if (e.key === "Escape") onCancel(); }}
-      style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 8px", height: 32, font: "500 13px/1 var(--rl-font-body)" }}
-    >
-      <option value="">—</option>
-      {fullOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+      value={v}
+      options={fullOpts}
+      onChange={(nv) => onCommit(nv)}
+      onClose={() => onCancel()}
+      style={{ width: "100%" }}
+    />
   );
 };
 

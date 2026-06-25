@@ -136,113 +136,6 @@ const NumericInput = React.forwardRef(({ value, onChange, placeholder, suffix, e
   );
 });
 
-// ---- IconSelect ----
-// Dropdown custom: trigger estilizado como prt-select + menu propio. Cada
-// option puede llevar { value, label, icon, iconBg, iconColor }. Seleccionada
-// resalta con fondo primary-50 + texto primary-900 (azul suave). Hover sutil.
-// Cierra al click afuera y al Esc.
-const IconSelect = ({ value, onChange, options, placeholder, error }) => {
-  const [open, setOpen] = React.useState(false);
-  const rootRef = React.useRef(null);
-  const sel = (options || []).find(o => o.value === value) || null;
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => {
-      if (!rootRef.current) return;
-      if (!rootRef.current.contains(e.target)) setOpen(false);
-    };
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={"prt-select" + (error ? " error" : "")}
-        style={{
-          display: "flex", alignItems: "center", gap: 10,
-          textAlign: "left", cursor: "pointer", paddingRight: 40,
-        }}
-        aria-expanded={open}
-      >
-        {sel ? (
-          <>
-            {sel.icon && (
-              <span style={{
-                width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                background: sel.iconBg || "var(--rl-gray-100)",
-                color: sel.iconColor || "var(--rl-gray-700)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}><Icon name={sel.icon} size={15} /></span>
-            )}
-            <span style={{ flex: 1, color: "var(--rl-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.label}</span>
-          </>
-        ) : (
-          <span style={{ flex: 1, color: "var(--rl-gray-400)", font: "400 14px/1 var(--rl-font-body)" }}>
-            {placeholder || "Seleccionar…"}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div
-          role="listbox"
-          style={{
-            position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 30,
-            background: "#fff", border: "1px solid var(--rl-gray-200)", borderRadius: 10,
-            boxShadow: "0 12px 28px rgba(16,24,40,0.10)",
-            padding: 6, maxHeight: 320, overflowY: "auto",
-          }}
-        >
-          {(options || []).map(o => {
-            const isSel = o.value === value;
-            return (
-              <button
-                type="button"
-                key={o.value}
-                role="option"
-                aria-selected={isSel}
-                onClick={() => { onChange && onChange(o.value); setOpen(false); }}
-                onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = "var(--rl-gray-50)"; }}
-                onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "transparent"; }}
-                style={{
-                  all: "unset", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 10,
-                  width: "100%", boxSizing: "border-box",
-                  padding: "9px 10px", marginBottom: 2,
-                  borderRadius: 8,
-                  background: isSel ? "var(--rl-primary-50)" : "transparent",
-                  color: isSel ? "var(--rl-primary-900)" : "var(--rl-gray-800)",
-                  font: (isSel ? 600 : 500) + " 13.5px/1 var(--rl-font-body)",
-                  transition: "background 90ms",
-                }}
-              >
-                {o.icon && (
-                  <span style={{
-                    width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                    background: o.iconBg || "var(--rl-gray-100)",
-                    color: o.iconColor || "var(--rl-gray-700)",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  }}><Icon name={o.icon} size={15} /></span>
-                )}
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
-                {isSel && <Icon name="check" size={16} />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ---- DatePicker ----
 // Calendario custom dentro de un popover. Trigger estilizado como prt-input.
 // value: ISO YYYY-MM-DD o "". max/min: ISO. Día seleccionado: fondo primary-100
@@ -419,21 +312,187 @@ function currentMonthISO() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
 }
 
-// ---- Select ----
-const Select = ({ value, onChange, options, placeholder, error, style }) => (
-  <select
-    className={"prt-select" + (error ? " error" : "")}
-    value={value || ""}
-    onChange={e => onChange && onChange(e.target.value)}
-    style={style}
-  >
-    <option value="" disabled hidden>{placeholder || "Seleccionar…"}</option>
-    {options.map(o => {
-      if (typeof o === "string") return <option key={o} value={o}>{o}</option>;
-      return <option key={o.value} value={o.value}>{o.label}</option>;
-    })}
-  </select>
-);
+// ---- Select (unificado) ----
+// Único componente de dropdown del proyecto. Trigger estilizado como
+// .prt-select y menú custom en popover. Soporta:
+//   - options como strings o { value, label, icon?, iconBg?, iconColor?, disabled? }.
+//   - size="sm" para tablas / barras compactas.
+//   - autoFocus: abre el menú apenas se monta (inline edit en tablas).
+//   - onClose: notifica cuando el menú se cierra SIN elección (Esc / click afuera).
+//   - Búsqueda automática cuando hay >= 10 opciones.
+// Selección: fondo primary-50 + texto primary-900 (azul suave) + check.
+// Hover: fondo gray-50. Cierra al click afuera y Esc.
+const Select = React.forwardRef(({
+  value, onChange, options, placeholder, error, disabled,
+  size, style, className, autoFocus, onBlur, onClose,
+}, ref) => {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const rootRef = React.useRef(null);
+  const triggerRef = React.useRef(null);
+  const searchRef = React.useRef(null);
+  const pickedRef = React.useRef(false);
+
+  const opts = (options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
+  const sel = opts.find(o => o.value === value) || null;
+  const SEARCH_THRESHOLD = 10;
+  const showSearch = opts.length >= SEARCH_THRESHOLD;
+  const filtered = !query
+    ? opts
+    : opts.filter(o => String(o.label || "").toLowerCase().includes(query.toLowerCase()));
+
+  // Abrir inmediatamente cuando autoFocus (inline edit).
+  React.useEffect(() => {
+    if (autoFocus) {
+      setOpen(true);
+      setTimeout(() => {
+        if (searchRef.current) searchRef.current.focus();
+        else if (triggerRef.current) triggerRef.current.focus();
+      }, 0);
+    }
+  }, []);
+
+  // Click afuera + Esc cierran. Reset query al cerrar. onClose si no hubo pick.
+  React.useEffect(() => {
+    if (!open) return;
+    pickedRef.current = false;
+    const onDoc = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+      setQuery("");
+      if (!pickedRef.current) {
+        if (onClose) onClose();
+      }
+      if (onBlur) onBlur();
+    };
+  }, [open]);
+
+  const pick = (v) => {
+    pickedRef.current = true;
+    onChange && onChange(v);
+    setOpen(false);
+  };
+
+  const wrapStyle = { position: "relative", ...(style || {}) };
+  const triggerCls = "prt-select" + (size === "sm" ? " prt-select-sm" : "") + (error ? " error" : "") + (className ? " " + className : "");
+  return (
+    <div
+      ref={(el) => { rootRef.current = el; if (typeof ref === "function") ref(el); else if (ref) ref.current = el; }}
+      style={wrapStyle}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className={triggerCls}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+        aria-expanded={open}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          textAlign: "left", cursor: disabled ? "not-allowed" : "pointer",
+        }}
+      >
+        {sel ? (
+          <>
+            {sel.icon && (
+              <span style={{
+                width: size === "sm" ? 22 : 26, height: size === "sm" ? 22 : 26,
+                borderRadius: 6, flexShrink: 0,
+                background: sel.iconBg || "var(--rl-gray-100)",
+                color: sel.iconColor || "var(--rl-gray-700)",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+              }}><Icon name={sel.icon} size={size === "sm" ? 13 : 15} /></span>
+            )}
+            <span style={{ flex: 1, color: "var(--rl-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {sel.label}
+            </span>
+          </>
+        ) : (
+          <span style={{ flex: 1, color: "var(--rl-gray-400)", font: (size === "sm" ? "400 12px/1 " : "400 14px/1 ") + "var(--rl-font-body)" }}>
+            {placeholder || "Seleccionar…"}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute", top: "calc(100% + 6px)", left: 0,
+            minWidth: "100%", zIndex: 100,
+            background: "#fff", border: "1px solid var(--rl-gray-200)", borderRadius: 10,
+            boxShadow: "0 12px 28px rgba(16,24,40,0.10)",
+            padding: 6, maxHeight: 320, overflowY: "auto",
+          }}
+        >
+          {showSearch && (
+            <div style={{ position: "sticky", top: -6, background: "#fff", paddingBottom: 6, marginBottom: 4, zIndex: 1 }}>
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+                placeholder="Buscar…"
+                className="prt-input"
+                style={{ height: 34, fontSize: 13 }}
+              />
+            </div>
+          )}
+          {filtered.length === 0 && (
+            <div style={{ padding: "10px 12px", font: "500 13px/1 var(--rl-font-body)", color: "var(--rl-gray-500)" }}>Sin resultados.</div>
+          )}
+          {filtered.map(o => {
+            const isSel = o.value === value;
+            return (
+              <button
+                type="button" key={String(o.value)}
+                role="option" aria-selected={isSel}
+                disabled={!!o.disabled}
+                onClick={() => pick(o.value)}
+                onMouseEnter={(e) => { if (!isSel && !o.disabled) e.currentTarget.style.background = "var(--rl-gray-50)"; }}
+                onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "transparent"; }}
+                style={{
+                  all: "unset", cursor: o.disabled ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 10,
+                  width: "100%", boxSizing: "border-box",
+                  padding: "9px 10px", marginBottom: 2,
+                  borderRadius: 8,
+                  background: isSel ? "var(--rl-primary-50)" : "transparent",
+                  color: o.disabled ? "var(--rl-gray-400)" : (isSel ? "var(--rl-primary-900)" : "var(--rl-gray-800)"),
+                  font: (isSel ? 600 : 500) + " 13.5px/1 var(--rl-font-body)",
+                  opacity: o.disabled ? 0.5 : 1,
+                  transition: "background 90ms",
+                }}
+              >
+                {o.icon && (
+                  <span style={{
+                    width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                    background: o.iconBg || "var(--rl-gray-100)",
+                    color: o.iconColor || "var(--rl-gray-700)",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  }}><Icon name={o.icon} size={15} /></span>
+                )}
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                {isSel && <Icon name="check" size={16} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// IconSelect: alias retrocompatible — el nuevo Select ya soporta iconos.
+const IconSelect = Select;
 
 // ---- Chip ----
 const Chip = ({ children, kind, size, icon, dot, onClose }) => (

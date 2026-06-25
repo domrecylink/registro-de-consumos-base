@@ -220,17 +220,27 @@ const ImpactoFilterBar = () => {
   const setRange = (start, end) => set("period", `custom:${start}:${end}`);
   return (
     <div className="prt-row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-      <select className="prt-select" style={{ width: 220 }} value={f.sucursal} onChange={e => set("sucursal", e.target.value)}>
-        <option value="all">Todas las sucursales ({activeSucNames(state).length})</option>
-        {activeSucNames(state).map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <select className="prt-select" style={{ width: 200 }} value={selValue} onChange={e => onPeriodChange(e.target.value)}>
-        <option value="12m">Últimos 12 meses</option>
-        <option value="6m">Últimos 6 meses</option>
-        <option value="3m">Últimos 3 meses</option>
-        <option value="1m">{periodLabel("1m")}</option>
-        <option value="custom">Personalizado…</option>
-      </select>
+      <Select
+        style={{ width: 220 }}
+        value={f.sucursal}
+        onChange={(v) => set("sucursal", v)}
+        options={[
+          { value: "all", label: `Todas las sucursales (${activeSucNames(state).length})` },
+          ...activeSucNames(state).map(s => ({ value: s, label: s })),
+        ]}
+      />
+      <Select
+        style={{ width: 200 }}
+        value={selValue}
+        onChange={(v) => onPeriodChange(v)}
+        options={[
+          { value: "12m", label: "Últimos 12 meses" },
+          { value: "6m",  label: "Últimos 6 meses" },
+          { value: "3m",  label: "Últimos 3 meses" },
+          { value: "1m",  label: periodLabel("1m") },
+          { value: "custom", label: "Personalizado…" },
+        ]}
+      />
       {isCustom && (
         <div className="prt-row" style={{ gap: 6, alignItems: "center" }}>
           <input type="month" className="prt-input" style={{ width: 150 }}

@@ -140,9 +140,15 @@ const PreviewRow = ({ row }) => {
       {/* Sucursal */}
       <td onClick={() => editCell("sucursal")} className={editing === "sucursal" ? "cell-edit" : ""}>
         {editing === "sucursal"
-          ? <select autoFocus value={row.sucursal} onChange={e => update("sucursal", e.target.value)} onBlur={commit} style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 16px", height: 44, font: "500 13px/1 var(--rl-font-body)", color: "var(--rl-gray-900)" }}>
-              {activeSucNames(state).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+          ? <Select
+              size="sm"
+              autoFocus
+              value={row.sucursal}
+              options={activeSucNames(state).map(s => ({ value: s, label: s }))}
+              onChange={(v) => { update("sucursal", v); commit(); }}
+              onClose={() => commit()}
+              style={{ width: "100%" }}
+            />
           : row.sucursal}
       </td>
 
@@ -161,10 +167,15 @@ const PreviewRow = ({ row }) => {
       {/* Subcategoría */}
       <td onClick={() => editCell("subcat")} className={editing === "subcat" ? "cell-edit" : ""}>
         {editing === "subcat" && subOptions.length > 0
-          ? <select autoFocus value={row.subcat || ""} onChange={e => update("subcat", e.target.value)} onBlur={commit} style={{ border: "none", outline: "none", background: "transparent", width: "100%", padding: "0 16px", height: 44, font: "500 13px/1 var(--rl-font-body)", color: "var(--rl-gray-900)" }}>
-              <option value="">—</option>
-              {subOptions.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+          ? <Select
+              size="sm"
+              autoFocus
+              value={row.subcat || ""}
+              options={subOptions.map(s => ({ value: s.id, label: s.label }))}
+              onChange={(v) => { update("subcat", v); commit(); }}
+              onClose={() => commit()}
+              style={{ width: "100%" }}
+            />
           : (row.subcat ? <Chip>{subcatLabel(row.type, row.subcat)}</Chip>
               : (subOptions.length > 0 ? <em style={{ color: "var(--rl-gray-400)" }}>elegir…</em> : <span className="prt-hint">—</span>))}
       </td>

@@ -114,10 +114,12 @@ const RefrigerantesSection = ({ sucId }) => {
           return (
             <div key={rf.uid} className="emis-refrig-row">
               <span className="prt-kpi-ico" style={{ width: 34, height: 34, background: CAT_META.refrigerantes.bg, color: CAT_META.refrigerantes.color }}><Icon name="snowflake" size={16} /></span>
-              <select className="prt-select" style={{ width: 130, height: 38 }} value={rf.tipo}
-                onChange={e => dispatch({ type: "EMIS/UPDATE_REFRIG", sucId, uid: rf.uid, patch: { tipo: e.target.value } })}>
-                {REFRIGERANTES_CATALOG.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
+              <Select
+                style={{ width: 130 }}
+                value={rf.tipo}
+                onChange={(v) => dispatch({ type: "EMIS/UPDATE_REFRIG", sucId, uid: rf.uid, patch: { tipo: v } })}
+                options={REFRIGERANTES_CATALOG.map(r => ({ value: r.id, label: r.label }))}
+              />
               <span className="emis-gwp-pill">GWP {def ? def.gwp.toLocaleString("es-CL") : "—"}</span>
               <div className="prt-input-wrap has-suffix" style={{ width: 130 }}>
                 <input className="prt-input" type="number" step="0.1" value={rf.cargaKg} style={{ height: 38 }}

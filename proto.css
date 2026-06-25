@@ -236,6 +236,7 @@ html, body {
 }
 .prt-input-wrap.has-suffix .prt-input { padding-right: 56px; }
 .prt-select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23344054' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px; cursor: pointer; }
+.prt-select-sm { height: 32px; font-size: 12.5px; padding: 0 36px 0 12px; border-radius: 7px; background-position: right 10px center; }
 .prt-select:hover { border-color: var(--rl-gray-400); }
 .prt-select:disabled { background-color: var(--rl-gray-50); color: var(--rl-gray-400); cursor: not-allowed; }
 .prt-select option { padding: 8px 12px; font-weight: 500; }
