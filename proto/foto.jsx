@@ -177,7 +177,7 @@ const FotoCaptureForm = ({ onUploaded }) => {
               <Select value={sucursal} onChange={setSucursal} options={sucOptions} placeholder="Elige sucursal" />
             </Field>
             <Field label="Período (mes)">
-              <Input type="month" value={periodo} onChange={setPeriodo} />
+              <Input type="month" value={periodo} onChange={setPeriodo} max={currentMonthISO()} />
             </Field>
             {subcatOptions.length > 0 && (
               <Field label="Subcategoría">
@@ -505,7 +505,7 @@ const FotoCompleteView = () => {
               <Select value={sucursal} onChange={setSucursal} options={sucOptions} placeholder="Elige sucursal" />
             </Field>
             <Field label="Período (mes)">
-              <Input type="month" value={periodo} onChange={setPeriodo} />
+              <Input type="month" value={periodo} onChange={setPeriodo} max={currentMonthISO()} />
             </Field>
             {subcatOptions.length > 0 && (
               <Field label="Subcategoría">

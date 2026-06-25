@@ -133,7 +133,7 @@ const PreviewRow = ({ row }) => {
       {/* Fecha */}
       <td onClick={() => editCell("date")} className={editing === "date" ? "cell-edit" : ""}>
         {editing === "date"
-          ? <input type="date" value={row.date} autoFocus onChange={e => update("date", e.target.value)} onBlur={commit} />
+          ? <input type="date" value={row.date} autoFocus onChange={e => update("date", e.target.value)} onBlur={commit} max={todayISO()} />
           : fmtDate(row.date)}
       </td>
 

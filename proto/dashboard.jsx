@@ -566,7 +566,7 @@ const DashFilterBar = () => {
             className="prt-input"
             style={{ width: 150 }}
             value={custom.start}
-            max={custom.end}
+            max={custom.end && custom.end < CURRENT_MONTH_KEY ? custom.end : CURRENT_MONTH_KEY}
             onChange={e => e.target.value && setRange(e.target.value, custom.end)}
           />
           <span className="prt-hint" style={{ opacity: 0.7 }}>—</span>

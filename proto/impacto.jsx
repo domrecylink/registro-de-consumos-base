@@ -234,7 +234,7 @@ const ImpactoFilterBar = () => {
       {isCustom && (
         <div className="prt-row" style={{ gap: 6, alignItems: "center" }}>
           <input type="month" className="prt-input" style={{ width: 150 }}
-            value={custom.start} max={custom.end}
+            value={custom.start} max={custom.end && custom.end < CURRENT_MONTH_KEY ? custom.end : CURRENT_MONTH_KEY}
             onChange={e => e.target.value && setRange(e.target.value, custom.end)} />
           <span className="prt-hint" style={{ opacity: 0.7 }}>—</span>
           <input type="month" className="prt-input" style={{ width: 150 }}

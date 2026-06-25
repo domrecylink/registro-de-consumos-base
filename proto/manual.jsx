@@ -273,7 +273,7 @@ const ManualForm = () => {
         <div className="prt-eyebrow" style={{ marginBottom: 12 }}>Datos compartidos del lote</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Field label="Fecha del consumo" required error={errs.date}>
-            <Input type="date" value={d.date} onChange={v => setShared("date", v)} />
+            <Input type="date" value={d.date} onChange={v => setShared("date", v)} max={todayISO()} />
           </Field>
           <Field label="Sucursal" required error={errs.sucursal}>
             <Select

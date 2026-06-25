@@ -31,7 +31,7 @@ const Field = ({ label, required, helper, helperKind, error, children, style }) 
 );
 
 // ---- Input ----
-const Input = React.forwardRef(({ value, onChange, placeholder, suffix, error, type = "text", autoFocus, onBlur, onKeyDown, style }, ref) => {
+const Input = React.forwardRef(({ value, onChange, placeholder, suffix, error, type = "text", autoFocus, onBlur, onKeyDown, style, min, max }, ref) => {
   return (
     <div className={"prt-input-wrap" + (suffix ? " has-suffix" : "")}>
       <input
@@ -45,11 +45,26 @@ const Input = React.forwardRef(({ value, onChange, placeholder, suffix, error, t
         onBlur={onBlur}
         onKeyDown={onKeyDown}
         style={style}
+        min={min}
+        max={max}
       />
       {suffix && <span className="prt-suffix">{suffix}</span>}
     </div>
   );
 });
+
+// Hoy en ISO local (YYYY-MM-DD) y mes actual (YYYY-MM). Para cap de inputs
+// date/month que no deben permitir futuro.
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" +
+         String(d.getMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getDate()).padStart(2, "0");
+}
+function currentMonthISO() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
 
 // ---- Select ----
 const Select = ({ value, onChange, options, placeholder, error, style }) => (
@@ -175,4 +190,5 @@ const ToastHost = () => {
 Object.assign(window, {
   Btn, Field, Input, Select, Chip, TypeIndicator,
   Card, SectionHead, Steps, EmptyState, ToastHost,
+  todayISO, currentMonthISO,
 });
