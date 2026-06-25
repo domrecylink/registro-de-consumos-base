@@ -90,6 +90,24 @@ const UploadStep1 = () => {
             </button>
           );
         })}
+        <div
+          className="prt-provider"
+          style={{
+            cursor: "default",
+            background: "var(--rl-gray-50)",
+            borderStyle: "dashed",
+            borderColor: "var(--rl-gray-300)",
+            display: "flex", flexDirection: "column", justifyContent: "center",
+          }}
+        >
+          <div className="prt-row" style={{ gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <Icon name="info" size={18} style={{ color: "var(--rl-gray-500)" }} />
+            <span className="prt-h4">¿Te falta un proveedor?</span>
+          </div>
+          <div className="prt-hint" style={{ fontSize: 12, lineHeight: 1.45 }}>
+            Escríbele a tu CSE y lo sumamos.
+          </div>
+        </div>
       </div>
       )}
     </div>
