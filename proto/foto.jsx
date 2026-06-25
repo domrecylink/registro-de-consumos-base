@@ -76,9 +76,22 @@ const FotoCaptureForm = ({ onUploaded }) => {
     // 3) fire-and-forget.
     (async () => {
       try {
-        await rcUploadFoto(params);
+        const up = await rcUploadFoto(params);
         dispatch({ type: "FOTO/INVALIDATE" });
         dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Foto subida", body: "Disponible en la cola." } });
+        // Notificación por correo (si hay destinatarios configurados).
+        try {
+          const prev = state.fotos.rows || [];
+          const totalPend = prev.filter(r => (r.status || "").toLowerCase() !== "procesado").length + 1;
+          rcNotifyFotoPending({
+            sucursal: params.sucursal,
+            tipo:     params.tipo,
+            periodo:  params.periodo,
+            link:     up && up.link,
+            fileName: params.file && params.file.name,
+            total:    totalPend,
+          });
+        } catch (e) { /* ignore */ }
       } catch (e) {
         dispatch({ type: "TOAST/SHOW", toast: { kind: "error", title: "Error subiendo foto", body: String(e && e.message || e) } });
       } finally {

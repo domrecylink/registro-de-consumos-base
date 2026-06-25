@@ -569,6 +569,33 @@ async function rcUploadFoto(params) {
   return { fileId: up.id, link: up.link };
 }
 
+// Lista de emails a notificar (cola fotos) persistida en Config sheet.
+async function rcReadFotoNotifEmails() {
+  if (!rcEndpointConfigured()) return [];
+  const data = await rcApiGet({ action: "getConfig", key: "fotoNotifEmails" });
+  const v = data && data.value;
+  return Array.isArray(v) ? v.filter(e => typeof e === "string" && e.indexOf("@") !== -1) : [];
+}
+
+async function rcWriteFotoNotifEmails(emails) {
+  if (!rcEndpointConfigured()) return;
+  const clean = (emails || [])
+    .map(e => String(e || "").trim())
+    .filter(e => e && e.indexOf("@") !== -1);
+  await rcApiPost({ action: "setConfig", key: "fotoNotifEmails", value: clean });
+}
+
+// Dispara el correo a los destinatarios configurados. Fire-and-forget; nunca
+// rompe el flujo de subida si falla.
+async function rcNotifyFotoPending(info) {
+  if (!rcEndpointConfigured()) return;
+  try {
+    await rcApiPost({ action: "notifyFotoPending", ...(info || {}) });
+  } catch (e) {
+    console.warn("[rc-sync] notifyFotoPending failed", e);
+  }
+}
+
 async function rcReadFotos() {
   if (!rcEndpointConfigured()) return [];
   const data = await rcApiGet({ action: "getFotos" });
@@ -894,6 +921,19 @@ const SyncBootstrap = () => {
         console.warn("[rc-sync] emissions load failed", e);
       }
       window.__rcEmissionsBootstrapped = true;
+
+      // 4) Emails de notificación cola fotos
+      try {
+        const emails = await rcReadFotoNotifEmails();
+        const { dispatch } = window.__rcStoreRef || {};
+        if (dispatch) {
+          window.__rcLoadedNotifJson = JSON.stringify(emails);
+          dispatch({ type: "NOTIF/LOAD", emails });
+        }
+      } catch (e) {
+        console.warn("[rc-sync] notif emails load failed", e);
+      }
+      window.__rcNotifBootstrapped = true;
     }
     init();
   }, []);
@@ -961,6 +1001,28 @@ const StoreBridge = () => {
     }, 800);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [app.state.configSucursales]);
+
+  // Guarda emails de notificación cuando cambian (debounce 600ms).
+  const notifDebounceRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!window.__rcNotifBootstrapped) return;
+    const json = JSON.stringify(app.state.fotoNotifEmails || []);
+    if (notifDebounceRef.current) clearTimeout(notifDebounceRef.current);
+    notifDebounceRef.current = setTimeout(async () => {
+      if (!rcEndpointConfigured()) return;
+      if (window.__rcLoadedNotifJson === json) {
+        window.__rcLoadedNotifJson = undefined;
+        return;
+      }
+      try {
+        await rcWriteFotoNotifEmails(app.state.fotoNotifEmails || []);
+        console.log("[rc-sync] fotoNotifEmails guardados:", (app.state.fotoNotifEmails || []).length);
+      } catch (e) {
+        console.error("[rc-sync] notif emails save failed", e);
+      }
+    }, 600);
+    return () => { if (notifDebounceRef.current) clearTimeout(notifDebounceRef.current); };
+  }, [app.state.fotoNotifEmails]);
 
   // Guarda emisiones en Sheets cuando cambian (debounce 800ms).
   React.useEffect(() => {
@@ -1039,4 +1101,5 @@ Object.assign(window, {
   rcReadConfigSucursales, rcWriteConfigSucursales, rcFlattenConfig, rcUnflattenConfig,
   rcReadEmissions, rcWriteEmissions, rcFlattenEmissions, rcUnflattenEmissions,
   rcUploadFoto, rcReadFotos, rcCompleteFoto,
+  rcReadFotoNotifEmails, rcWriteFotoNotifEmails, rcNotifyFotoPending,
 });

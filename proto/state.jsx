@@ -140,6 +140,9 @@ const initialState = {
   // fotos (módulo "Tomar foto")
   fotos: { rows: [], loading: false, error: null, invalidatedAt: 0, inflightJobs: [] },
   fotoCompleteRow: null,      // rowIndex de la fila siendo completada
+  // Lista de emails a notificar cuando se sube una nueva foto pendiente.
+  // Persiste en hoja Config (key "fotoNotifEmails") vía Apps Script.
+  fotoNotifEmails: [],
   // domain — empty by default; populated from Google Sheets on login + refresh
   records: [],
   recordsLoading: false,
@@ -219,6 +222,20 @@ function reducer(state, action) {
       return { ...state, fotos: { ...state.fotos, inflightJobs: [...(state.fotos.inflightJobs || []), action.job] } };
     case "FOTO/JOB_END":
       return { ...state, fotos: { ...state.fotos, inflightJobs: (state.fotos.inflightJobs || []).filter(j => j.id !== action.id) } };
+
+    // ----- Notificaciones (emails para cola fotos)
+    case "NOTIF/LOAD":
+      return { ...state, fotoNotifEmails: Array.isArray(action.emails) ? action.emails : [] };
+    case "NOTIF/SET":
+      return { ...state, fotoNotifEmails: Array.isArray(action.emails) ? action.emails : [] };
+    case "NOTIF/ADD": {
+      const e = (action.email || "").trim();
+      if (!e) return state;
+      if ((state.fotoNotifEmails || []).indexOf(e) !== -1) return state;
+      return { ...state, fotoNotifEmails: [...(state.fotoNotifEmails || []), e] };
+    }
+    case "NOTIF/REMOVE":
+      return { ...state, fotoNotifEmails: (state.fotoNotifEmails || []).filter(e => e !== action.email) };
 
     // ----- Manual draft
     case "MANUAL/SET_SHARED_FIELD": {

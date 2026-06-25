@@ -102,6 +102,8 @@ const ConfigView = () => {
         ))}
       </div>
 
+      <NotifEmailsSection />
+
       {/* Deactivate confirmation */}
       {confirmModal?.type === "deactivate" && (
         <ConfirmDialog
@@ -164,4 +166,61 @@ const ConfirmDialog = ({ icon, iconBg, iconColor, title, description, detail, ac
   </div>
 );
 
-Object.assign(window, { ConfigView, ConfirmDialog });
+// Editor de emails que reciben aviso al subir foto pendiente.
+const NotifEmailsSection = () => {
+  const { state, dispatch } = useApp();
+  const emails = state.fotoNotifEmails || [];
+  const [draft, setDraft] = React.useState("");
+  const [error, setError] = React.useState("");
+
+  const validEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+
+  const add = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!validEmail(v)) { setError("Email inválido."); return; }
+    if (emails.indexOf(v) !== -1) { setError("Ya está en la lista."); return; }
+    dispatch({ type: "NOTIF/ADD", email: v });
+    setDraft("");
+    setError("");
+  };
+
+  const remove = (e) => dispatch({ type: "NOTIF/REMOVE", email: e });
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <SectionHead
+        eyebrow="Notificaciones"
+        title="Avisos de cola pendiente (Tomar foto)"
+        sub="Cada vez que se suba una foto al módulo Tomar foto, estos destinatarios reciben un correo con los datos y el total pendiente."
+      />
+      <Card>
+        <div className="prt-col" style={{ gap: 12 }}>
+          <div className="prt-row" style={{ gap: 8, flexWrap: "wrap" }}>
+            {emails.length === 0 && (
+              <span className="prt-hint">Sin destinatarios — no se enviará correo.</span>
+            )}
+            {emails.map(e => (
+              <Chip key={e} kind="neutral" icon="mail" onClose={() => remove(e)}>{e}</Chip>
+            ))}
+          </div>
+          <div className="prt-row" style={{ gap: 8, alignItems: "flex-start" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Field error={error}>
+                <Input
+                  value={draft}
+                  onChange={(v) => { setDraft(v); if (error) setError(""); }}
+                  placeholder="nombre@empresa.cl"
+                  onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); add(); } }}
+                />
+              </Field>
+            </div>
+            <Btn kind="primary" icon="add" onClick={add} disabled={!draft.trim()}>Agregar</Btn>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+Object.assign(window, { ConfigView, ConfirmDialog, NotifEmailsSection });

@@ -118,6 +118,9 @@ function doPost(e) {
       ensureSheets();
       return jsonOut({ ok: true });
     }
+    if (action === "notifyFotoPending") {
+      return jsonOut(notifyFotoPending(body));
+    }
     return jsonOut({ error: "unknown action: " + action });
   } catch (err) {
     return jsonOut({ error: String(err && err.message || err) });
@@ -280,6 +283,64 @@ function setEmissions(rows) {
   if (rows && rows.length) {
     sheet.getRange(2, 1, rows.length, EMISSIONS_HEADERS.length).setValues(rows);
   }
+}
+
+// Helper de autorización: forzar consent del scope MailApp.
+// Correr desde el editor (Run ▶) — pide permiso la primera vez y manda
+// un correo de prueba a tu propia cuenta.
+function _authorizeMail() {
+  var to = Session.getActiveUser().getEmail();
+  MailApp.sendEmail({
+    to: to,
+    subject: "[Registro Consumos] Test autorización MailApp",
+    body: "Si recibes esto, el scope MailApp quedó autorizado.",
+  });
+  return { ok: true, to: to, remaining: MailApp.getRemainingDailyQuota() };
+}
+
+// ----- Notificación cola Fotos -------------------------------------------
+// Recibe { sucursal, tipo, periodo, link, total, fileName } y manda mail a
+// los destinatarios configurados (key "fotoNotifEmails" en hoja Config).
+
+function notifyFotoPending(body) {
+  var cfg = getConfigValue("fotoNotifEmails");
+  var emails = (cfg && Array.isArray(cfg.value)) ? cfg.value : [];
+  emails = emails
+    .map(function (e) { return String(e || "").trim(); })
+    .filter(function (e) { return e && e.indexOf("@") !== -1; });
+  if (!emails.length) return { ok: true, sent: 0, reason: "no recipients" };
+
+  var sucursal = body.sucursal || "—";
+  var tipo     = body.tipo     || "—";
+  var periodo  = body.periodo  || "—";
+  var link     = body.link     || "";
+  var total    = body.total    != null ? body.total : "?";
+  var fileName = body.fileName || "";
+
+  var subject = "[Registro Consumos] Nueva foto pendiente · " + sucursal;
+  var lines = [
+    "Se subió una nueva foto al módulo Tomar foto. Queda pendiente de completar datos.",
+    "",
+    "Sucursal: " + sucursal,
+    "Tipo: "     + tipo,
+    "Período: "  + periodo,
+    "Archivo: "  + (fileName || "—"),
+    "Drive: "    + (link || "—"),
+    "",
+    "Total pendientes en cola: " + total,
+    "",
+    "Para completar los datos abre la app o edita la fila en la planilla.",
+  ];
+  var sent = 0;
+  emails.forEach(function (to) {
+    try {
+      MailApp.sendEmail({ to: to, subject: subject, body: lines.join("\n") });
+      sent++;
+    } catch (e) {
+      // continúa con los demás
+    }
+  });
+  return { ok: true, sent: sent, recipients: emails.length };
 }
 
 // ----- Fotos (módulo "Tomar foto") --------------------------------------
