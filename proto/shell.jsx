@@ -210,7 +210,7 @@ const VersionWatcher = () => {
 //   2) O click 5 veces en el logo "R" de la sidebar (<2s).
 //   Cerrar: Esc o click fuera.
 // 👉 Pegar "usuario/repo" del nuevo repositorio para reactivar el badge de build.
-const BUILD_REPO = "";
+const BUILD_REPO = "domrecylink/registro-de-consumos-base";
 
 const BuildBadge = () => {
   const [open, setOpen] = React.useState(false);
