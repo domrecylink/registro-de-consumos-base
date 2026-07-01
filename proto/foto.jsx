@@ -1,4 +1,4 @@
-// foto.jsx — Módulo "Tomar foto" para Ando. Una sola vista (FotoHubView) con
+// foto.jsx — Módulo "Tomar foto" para Base. Una sola vista (FotoHubView) con
 // pestañas Nueva / Cola. Completar datos abre una vista aparte (FotoCompleteView).
 // Mobile-first: foto al principio del form, solo foto obligatoria, resto opcional.
 

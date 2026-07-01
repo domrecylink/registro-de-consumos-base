@@ -9,7 +9,7 @@
  *
  * --- CÓMO DESPLEGAR ---
  *
- * 1. Abre la planilla:
+ * 1. Abre la planilla de destino:
  *    https://docs.google.com/spreadsheets/d/1e6v7yPP05w05OIfsHRyyU3cfXXDPhVzg43TL_HvXihU
  *
  * 2. Menú: Extensiones > Apps Script
@@ -45,15 +45,15 @@
 // en el proyecto Apps Script) ya declara `var CONFIG`. Si usáramos el mismo nombre
 // Apps Script lanza "Identifier 'CONFIG' has already been declared". Convivimos.
 const WEB_CFG = {
-  // 👉 INSTANCIA ANDO. Si copias este archivo a la planilla Euro, cambia este ID.
-  SPREADSHEET_ID: "1Aa0daLD5uyHbgQuxWGsxUADJXw4eqU7Qhr7kyDjK7_w",
+  // 👉 ID de la planilla de destino.
+  SPREADSHEET_ID: "1e6v7yPP05w05OIfsHRyyU3cfXXDPhVzg43TL_HvXihU",
   FOLDERS: {
-    ENEL_POR_PROCESAR:  "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz",
-    ENEL_PROCESADOS:    "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9",
-    AGUAS_POR_PROCESAR: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE",
-    AGUAS_PROCESADOS:   "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R",
-    FOTOS_POR_COMPLETAR:"1WbBQXZBKixe-5nd54G07xOsdo0P6Qs_k",
-    FOTOS_PROCESADOS:   "13oru7kNnvMW5S8jV_sKPQyMvt80luFrP",
+    ENEL_POR_PROCESAR:  "",
+    ENEL_PROCESADOS:    "",
+    AGUAS_POR_PROCESAR: "",
+    AGUAS_PROCESADOS:   "",
+    FOTOS_POR_COMPLETAR:"1mq1U7vk_seU9pwYeGBX0j8xEJbXbSoYh",
+    FOTOS_PROCESADOS:   "1-CJqu2-qIiodYwh-KBkeuAnASzC0w4PP",
   },
   HEADERS: {
     Combustible:    ["Link", "Fecha", "Consumo", "Costo", "Empresa", "Sucursal", "Tipo", "Proveedor", "Estado", "Origen"],

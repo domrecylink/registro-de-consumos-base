@@ -209,7 +209,8 @@ const VersionWatcher = () => {
 //   1) Atajo: Ctrl+Shift+B (toggle).
 //   2) O click 5 veces en el logo "R" de la sidebar (<2s).
 //   Cerrar: Esc o click fuera.
-const BUILD_REPO = "domrecylink/registro-de-consumos-ando";
+// 👉 Pegar "usuario/repo" del nuevo repositorio para reactivar el badge de build.
+const BUILD_REPO = "";
 
 const BuildBadge = () => {
   const [open, setOpen] = React.useState(false);
@@ -236,6 +237,7 @@ const BuildBadge = () => {
 
   React.useEffect(() => {
     if (!open || data) return;
+    if (!BUILD_REPO) { setErr("BUILD_REPO no configurado en shell.jsx"); return; }
     fetch("https://api.github.com/repos/" + BUILD_REPO + "/commits/main")
       .then(r => r.json())
       .then(j => {

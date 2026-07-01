@@ -7,17 +7,17 @@
 // Para desplegar el backend ver `apps-script.gs` en la raíz del proyecto y
 // pegar la URL resultante en APPS_SCRIPT_URL más abajo.
 
-// === Instancia: ANDO ======================================================
-// Esta es la copia destinada a la empresa "Ando". Reemplazar los placeholders
-// PEGAR_*_ANDO con los valores reales antes de desplegar a Netlify.
+// === Instancia: SIN CONFIGURAR ============================================
+// Backend des-asociado. Pegar los valores de la nueva planilla / Apps Script /
+// carpetas Drive antes de desplegar. Con estos placeholders vacíos la app corre
+// en modo local (sin sincronización a Sheets/Drive).
 const RC_CONFIG = {
-  // 👉 URL /exec del Apps Script desplegado sobre la planilla de Ando.
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx8lv-j6Z98X4QnoAHMQy-vmVihcxkec6cdcPCqAvE9E_p_0b7nOHCaNEQMJAki8LULwA/exec",
+  // 👉 URL /exec del Apps Script desplegado sobre la nueva planilla.
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxP25MmfKXbCQJzh1gj2KCkMjOMLGLLs6zuWcZdPTQ58_E9prlNfhXwThVIaLFyPANu/exec",
 
-  // 👉 URL completa de la planilla "Copia de Registro de Consumo - Sandbox"
-  //    (carpeta Drive: 8 TI/8.5 Registros de Consumo/Ando).
+  // 👉 URL completa de la planilla de destino.
   SPREADSHEET_URL:
-    "https://docs.google.com/spreadsheets/d/1Aa0daLD5uyHbgQuxWGsxUADJXw4eqU7Qhr7kyDjK7_w",
+    "https://docs.google.com/spreadsheets/d/1e6v7yPP05w05OIfsHRyyU3cfXXDPhVzg43TL_HvXihU",
 
   SHEETS: {
     COMBUSTIBLE: "Combustible",
@@ -27,29 +27,29 @@ const RC_CONFIG = {
 
   FOLDERS: {
     // Flujo "Tomar foto".
-    FOTOS_POR_COMPLETAR:"1WbBQXZBKixe-5nd54G07xOsdo0P6Qs_k",
-    FOTOS_PROCESADOS:   "13oru7kNnvMW5S8jV_sKPQyMvt80luFrP",
+    FOTOS_POR_COMPLETAR: "1mq1U7vk_seU9pwYeGBX0j8xEJbXbSoYh",
+    FOTOS_PROCESADOS:    "1-CJqu2-qIiodYwh-KBkeuAnASzC0w4PP",
     // Facturas adjuntas en registro manual.
-    MANUAL_FACTURAS:    "1_V5cHpEBJItL0yr-Mi2Oz5IqMu5hkIAH",
+    MANUAL_FACTURAS:     "1nsr_3rHFGz2qUtOLdGbp3limmyQKTV7b",
     // Fallback para "Subir documento" cuando el proveedor no tiene folder propio.
-    UPLOAD_FACTURAS:    "",
+    UPLOAD_FACTURAS:     "1QcLsiuOBTxBE5SuSeC-A93hxpT6DpQ3Z",
   },
   // Folders dedicados por proveedor para "Subir documento". Cada entrada:
   //   { porProcesar: "<id>", procesados: "<id>" }
   // Si una entrada falta o tiene IDs vacíos, ese proveedor usa MANUAL_FACTURAS /
   // UPLOAD_FACTURAS como fallback y NO mueve a "procesados".
   PROVIDER_FOLDERS: {
-    "enel":            { porProcesar: "1_9EbWKV-G81PbIs0Pp5v9GwfsDADe-nz", procesados: "1L042MBiUp3ChzOVTAfkVp8kI6X3vyVk9" },
-    "cge":             { porProcesar: "1kYVBaLrGGV5Gy6i_C-BeibmzdGPwoa2i", procesados: "1FHKg06YqdWuyFYqUwIfo5wpcA3NBYY4G" },
-    "aguas-andinas":   { porProcesar: "1YgqYW-hoHD5T550-99Y22SQ0wuY3XrkE", procesados: "1LrI8Oe5_CE68ptdd6Hh0Ixu-xfEwOz6R" },
-    "aguas-del-valle": { porProcesar: "1eTRRR64rEvGHPo4Obc-l8OOTHJBtf1e9", procesados: "1L67g7gl1YaePbqV73aup94Jyr9hR1g5N" },
-    "esval":           { porProcesar: "",                                   procesados: "" },
-    "iconstruye-pet":  { porProcesar: "",                                   procesados: "" },
-    "copec":           { porProcesar: "",                                   procesados: "" },
-    "shell":           { porProcesar: "",                                   procesados: "" },
+    "enel":            { porProcesar: "14lxouOWby_LLGc2MP-sgFNtz3ND602JF", procesados: "1_XmUG4S-Xj5YXRM0F6yUG5MwfUJnYyS1" },
+    "cge":             { porProcesar: "1S_LM0JZQiPK11ZIitZh_-6ogaBQC3T4F", procesados: "1r031w14aO9qwDgdJ1MdUT1yeUJfor7ji" },
+    "aguas-andinas":   { porProcesar: "1rh7kUuXYcPgdOxASZwKqeBmL4tCQ6Bh4", procesados: "1Cw8cbfTQ06apvR3bfSqS4XUO6X30BvOm" },
+    "aguas-del-valle": { porProcesar: "1odsbmsHQXLEEPL9K4jKTjpgDBOlucdpJ", procesados: "1aqKBvO70VkyenEKOGma9QpTSVHduHjVo" },
+    "esval":           { porProcesar: "1dTplQEdsSRdqkNyQnR9j3N84l3cUf4Qb", procesados: "1TZ75kRnHhJqssv7wmUIrEW1_ULXsHW83" },
+    "iconstruye-pet":  { porProcesar: "1kpDkya1QbVKvFuB8SWlkScaba875Cl9Z", procesados: "16MUXcVYLMZgqXpIvcocb3OCVy8PApN2a" },
+    "copec":           { porProcesar: "180AC7vM54Eyy5utNbbpB8FopdWltDPlw", procesados: "1Rwmm4d0x7Tw3nclUQmGFW2ExcNaDGW1m" },
+    "shell":           { porProcesar: "1BzkTxGAMtwKI_iqhrfSUINCg5yPk3DU0", procesados: "1CtP5yF9MhpYV9MsfzJRW-1V-JjDDcTrw" },
   },
 
-  EMPRESA: "Ando",
+  EMPRESA: "Base",
 };
 
 // ----- Endpoint helpers ---------------------------------------------------
