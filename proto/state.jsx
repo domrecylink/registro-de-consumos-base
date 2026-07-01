@@ -99,8 +99,13 @@ function seedEmissions() {
 }
 
 // ----- Sucursales config seed -----
+// ID único global. Antes era un contador que arrancaba en 0 por carga de
+// página → todos generaban "suc1" y se pisaban al guardar (upsert por ID).
+// timestamp base36 + 4 chars aleatorios: sin colisión entre usuarios/recargas.
 let __sucIdC = 0;
-const nextSucId = () => "suc" + (++__sucIdC);
+const nextSucId = () =>
+  "suc_" + Date.now().toString(36) + "_" + (++__sucIdC) +
+  Math.random().toString(36).slice(2, 6);
 let __itemIdC = 0;
 const nextItemId = () => "itm" + (++__itemIdC);
 
@@ -545,7 +550,9 @@ function reducer(state, action) {
         ),
       };
     case "CONFIG/CREATE_PROJECT": {
-      // Persist onboarding output into configSucursales (replaces existing list)
+      // Aditivo: agrega/actualiza por ID sin borrar las sucursales existentes.
+      // Antes reemplazaba la lista completa → al re-entrar y crear otra, se
+      // perdían las anteriores.
       const newSucs = action.sucursales.map(s => ({
         id: s.id,
         nombre: s.nombre.trim(),
@@ -558,7 +565,9 @@ function reducer(state, action) {
           refrigerantes: { activo: false, subcats: [] },
         },
       }));
-      return { ...state, configSucursales: newSucs };
+      const _incomingIds = new Set(newSucs.map(s => s.id));
+      const _kept = state.configSucursales.filter(s => !_incomingIds.has(s.id));
+      return { ...state, configSucursales: [..._kept, ...newSucs] };
     }
 
     // ----- Emisiones GEI
