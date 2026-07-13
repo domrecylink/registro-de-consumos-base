@@ -23,6 +23,10 @@ const RC_CONFIG = {
     COMBUSTIBLE: "Combustible",
     ELECTRICIDAD: "Electricidad",
     AGUA: "Agua",
+    // Módulo Medidores (lecturas físicas).
+    MED_MEDIDORES: "Medidores",
+    MED_LECTURAS:  "Lecturas Medidor",
+    MED_PRECIOS:   "Precios Medidor",
   },
 
   FOLDERS: {
@@ -33,6 +37,16 @@ const RC_CONFIG = {
     MANUAL_FACTURAS:     "1nsr_3rHFGz2qUtOLdGbp3limmyQKTV7b",
     // Fallback para "Subir documento" cuando el proveedor no tiene folder propio.
     UPLOAD_FACTURAS:     "1QcLsiuOBTxBE5SuSeC-A93hxpT6DpQ3Z",
+    // Módulo Medidores — adjuntos por medidor/mes.
+    // Carpetas bajo Sandbox/Documentos de Pago y Sandbox/Fotos Medidores.
+    MEDIDOR_FACTURAS:   "1wiseH6N8rOq2d-81XXoGGHTUm4lB_hRB",
+    MEDIDOR_PAGOS:      "1wXMGHY8g7WGei3b754568vDzgvkQnwGw",
+    // Fotos de respaldo de lecturas (registro móvil) — una carpeta por tipo.
+    MEDIDOR_RESPALDOS: {
+      agua:         "1DTNzlz85y4FXqO9EKcJ68gArxXfkWSlO",
+      combustible:  "13gqEJm0oylbuscpROLcvNh5bcEYGVlVF",
+      electricidad: "10h5JiwxfUYjl8gtHI0-vTBNVTJEqGcEO",
+    },
   },
   // Folders dedicados por proveedor para "Subir documento". Cada entrada:
   //   { porProcesar: "<id>", procesados: "<id>" }
@@ -370,6 +384,145 @@ async function rcReadEmissions() {
 async function rcWriteEmissions(emissions) {
   if (!rcEndpointConfigured()) return;
   await rcApiPost({ action: "setEmissions", rows: rcFlattenEmissions(emissions) });
+}
+
+// ----- Medidores (hojas "Medidores" / "Lecturas Medidor" / "Precios Medidor") --
+// Mismo patrón clear+rewrite que emisiones/config. Los documentos (Factura/Pago)
+// viajan dentro de las filas de lecturas: una fila por (medidor, mes) con lectura
+// y/o links de Drive.
+
+// Medidores: [id, sucursal, tipo, nombre, numero, activo]
+function rcFlattenMedidores(meters) {
+  return (meters || []).map(m => [
+    m.id, m.sucursal || "", m.type || "", m.nombre || "", m.numero || "", m.activo ? "Sí" : "No",
+  ]);
+}
+function rcUnflattenMedidores(rows) {
+  return (rows || []).filter(r => r[0]).map(r => ({
+    id: r[0],
+    sucursal: r[1] || "",
+    type: r[2] || "",
+    nombre: r[3] || "",
+    numero: r[4] != null ? String(r[4]) : "",
+    activo: String(r[5]).trim().toLowerCase() !== "no",
+  }));
+}
+
+// Lecturas + docs: [id, meterId, periodo, lectura, facturaLink, facturaNombre,
+//                   facturaFileId, pagoLink, pagoNombre, pagoFileId,
+//                   respaldoLink, respaldoNombre, respaldoFileId]
+function rcFlattenMedLecturas(readings, docs) {
+  const map = new Map();
+  (readings || []).forEach(r => {
+    map.set(r.meterId + "__" + r.month, { id: r.id || "", meterId: r.meterId, month: r.month, lectura: r.lectura });
+  });
+  Object.entries(docs || {}).forEach(([key, d]) => {
+    const i = key.indexOf("__");
+    const meterId = key.slice(0, i), month = key.slice(i + 2);
+    const cur = map.get(key) || { id: "", meterId, month, lectura: "" };
+    cur.factura  = (d && d.factura) || null;
+    cur.pago     = (d && d.pago) || null;
+    cur.respaldo = (d && d.respaldo) || null;
+    map.set(key, cur);
+  });
+  return [...map.values()].map(r => [
+    r.id || "", r.meterId, r.month, (r.lectura == null ? "" : r.lectura),
+    r.factura ? (r.factura.link || "") : "", r.factura ? (r.factura.name || "") : "", r.factura ? (r.factura.fileId || "") : "",
+    r.pago ? (r.pago.link || "") : "", r.pago ? (r.pago.name || "") : "", r.pago ? (r.pago.fileId || "") : "",
+    r.respaldo ? (r.respaldo.link || "") : "", r.respaldo ? (r.respaldo.name || "") : "", r.respaldo ? (r.respaldo.fileId || "") : "",
+  ]);
+}
+function rcUnflattenMedLecturas(rows) {
+  const readings = [];
+  const docs = {};
+  (rows || []).forEach(r => {
+    const id = r[0] || "", meterId = r[1] || "", month = r[2] || "";
+    if (!meterId || !month) return;
+    // El Sheet devuelve display values (decimal con coma, ej "15771,848").
+    // rcNum normaliza coma/miles → número. Solo omitimos celdas vacías.
+    const lectura = r[3];
+    if (lectura !== "" && lectura != null) {
+      readings.push({ id: id || ("lec_" + meterId + "_" + month), meterId, month, lectura: rcNum(lectura) });
+    }
+    const fLink = r[4] || "", fName = r[5] || "", fId = r[6] || "";
+    const pLink = r[7] || "", pName = r[8] || "", pId = r[9] || "";
+    const rLink = r[10] || "", rName = r[11] || "", rId = r[12] || "";
+    if (fLink || pLink || rLink) {
+      const key = meterId + "__" + month;
+      docs[key] = {};
+      if (fLink) docs[key].factura  = { link: fLink, name: fName, fileId: fId };
+      if (pLink) docs[key].pago     = { link: pLink, name: pName, fileId: pId };
+      if (rLink) docs[key].respaldo = { link: rLink, name: rName, fileId: rId };
+    }
+  });
+  return { readings, docs };
+}
+
+// Precios: [sucursal, tipo, periodo, precio]
+function rcFlattenMedPrecios(prices) {
+  return (prices || []).map(p => [p.sucursal || "", p.type || "", p.month || "", p.precio]);
+}
+function rcUnflattenMedPrecios(rows) {
+  return (rows || []).filter(r => r[0] && r[2]).map(r => ({
+    sucursal: r[0], type: r[1] || "", month: r[2], precio: rcNum(r[3]),
+  }));
+}
+
+async function rcReadMedidores() {
+  if (!rcEndpointConfigured()) return null;
+  const [med, lec, pre] = await Promise.all([
+    rcApiGet({ action: "getMedidores" }),
+    rcApiGet({ action: "getLecturasMedidor" }),
+    rcApiGet({ action: "getPreciosMedidor" }),
+  ]);
+  const meters = rcUnflattenMedidores((med && med.rows) || []);
+  const { readings, docs } = rcUnflattenMedLecturas((lec && lec.rows) || []);
+  const prices = rcUnflattenMedPrecios((pre && pre.rows) || []);
+  return { meters, readings, prices, docs };
+}
+
+async function rcWriteMedidores(M) {
+  if (!rcEndpointConfigured()) return;
+  await rcApiPost({ action: "setMedidores",        rows: rcFlattenMedidores(M.meters) });
+  await rcApiPost({ action: "setLecturasMedidor",  rows: rcFlattenMedLecturas(M.readings, M.docs) });
+  await rcApiPost({ action: "setPreciosMedidor",   rows: rcFlattenMedPrecios(M.prices) });
+}
+
+// Sube un documento (Factura/Pago/Respaldo) de medidor a su carpeta Drive. Sin
+// backend configurado cae a un objectURL local para no romper el flujo en pruebas.
+// `meter`/`month` solo se usan para respaldos: carpeta raíz por tipo de consumo
+// y adentro subcarpetas <medidor>/<mes> creadas automáticamente por el Apps Script.
+async function rcUploadMedidorDoc(file, kind, meter, month) {
+  const type = meter && meter.type;
+  const folder = kind === "pago" ? RC_CONFIG.FOLDERS.MEDIDOR_PAGOS
+    : kind === "respaldo" ? (RC_CONFIG.FOLDERS.MEDIDOR_RESPALDOS || {})[type] || ""
+    : RC_CONFIG.FOLDERS.MEDIDOR_FACTURAS;
+  if (!rcEndpointConfigured() || !folder) {
+    return { id: "", link: URL.createObjectURL(file), name: file.name, local: true };
+  }
+  let subfolders = [];
+  if (kind === "respaldo" && meter) {
+    const meterName = ((meter.nombre || "Medidor") + (meter.numero ? " (N° " + meter.numero + ")" : ""))
+      .replace(/[\/\\]/g, "-").trim();
+    subfolders = [meterName, month || ""].filter(Boolean);
+  }
+  const base64 = await rcFileToBase64(file);
+  const up = await rcApiPost({
+    action: "upload",
+    name: file.name,
+    mimeType: file.type || "application/octet-stream",
+    base64,
+    folderId: folder,
+    subfolders,
+  });
+  return { id: up.id, link: up.link, name: file.name };
+}
+
+// Envía a la papelera de Drive el archivo de un doc de medidor. Sin backend
+// o sin fileId (doc local de prueba) no hace nada.
+async function rcDeleteMedidorDoc(fileId) {
+  if (!rcEndpointConfigured() || !fileId) return;
+  await rcApiPost({ action: "deleteFile", fileId });
 }
 
 // ----- Read all records ---------------------------------------------------
@@ -972,6 +1125,8 @@ const SyncBootstrap = () => {
       if (!rcEndpointConfigured()) {
         console.warn("[rc-sync] APPS_SCRIPT_URL no está configurada — el dashboard quedará vacío.");
         window.__rcConfigBootstrapped = true;
+        const { dispatch } = window.__rcStoreRef || {};
+        if (dispatch) dispatch({ type: "MED/SET_LOADING", loading: false });
         return;
       }
       // 1) Registros (comportamiento anterior)
@@ -1020,6 +1175,24 @@ const SyncBootstrap = () => {
         console.warn("[rc-sync] notif emails load failed", e);
       }
       window.__rcNotifBootstrapped = true;
+
+      // 5) Medidores
+      try {
+        const med = await rcReadMedidores();
+        if (med && (med.meters.length || med.readings.length || med.prices.length || Object.keys(med.docs).length)) {
+          const { dispatch } = window.__rcStoreRef || {};
+          if (dispatch) {
+            window.__rcLoadedMedidoresJson = JSON.stringify(med);
+            dispatch({ type: "MED/LOAD", ...med });
+          }
+        }
+      } catch (e) {
+        console.warn("[rc-sync] medidores load failed", e);
+      } finally {
+        const { dispatch } = window.__rcStoreRef || {};
+        if (dispatch) dispatch({ type: "MED/SET_LOADING", loading: false });
+      }
+      window.__rcMedidoresBootstrapped = true;
     }
     init();
   }, []);
@@ -1154,6 +1327,30 @@ const StoreBridge = () => {
     return () => { if (emisDebounceRef.current) clearTimeout(emisDebounceRef.current); };
   }, [app.state.emissions]);
 
+  // Guarda medidores (meters/readings/prices/docs) en Sheets cuando cambian (debounce 900ms).
+  const medDebounceRef = React.useRef(null);
+  const med = app.state.medidores;
+  React.useEffect(() => {
+    if (!window.__rcMedidoresBootstrapped) return;
+    const slice = { meters: med.meters, readings: med.readings, prices: med.prices, docs: med.docs };
+    const json = JSON.stringify(slice);
+    if (medDebounceRef.current) clearTimeout(medDebounceRef.current);
+    medDebounceRef.current = setTimeout(async () => {
+      if (!rcEndpointConfigured()) return;
+      if (window.__rcLoadedMedidoresJson === json) {
+        window.__rcLoadedMedidoresJson = undefined;
+        return;
+      }
+      try {
+        await rcWriteMedidores(slice);
+        console.log("[rc-sync] medidores guardados");
+      } catch (e) {
+        console.error("[rc-sync] medidores save failed", e);
+      }
+    }, 900);
+    return () => { if (medDebounceRef.current) clearTimeout(medDebounceRef.current); };
+  }, [med.meters, med.readings, med.prices, med.docs]);
+
   return null;
 };
 
@@ -1212,4 +1409,5 @@ Object.assign(window, {
   rcUploadFoto, rcReadFotos, rcCompleteFoto,
   rcReadFotoNotifEmails, rcWriteFotoNotifEmails, rcNotifyFotoPending,
   rcAttachDocumentToRecord,
+  rcReadMedidores, rcWriteMedidores, rcUploadMedidorDoc, rcDeleteMedidorDoc,
 });
