@@ -373,7 +373,7 @@ const ResumenTab = ({ suc, type, meters, monthsView }) => {
     <div className="rc-med-resumen">
       <div className="rc-med-resumen-bar">
         <MedMeterPicker meters={meters} selected={selected} onToggle={toggle} onAll={selectAll} onNone={selectNone} colorOf={colorOf} />
-        <Btn icon="file_download" disabled={!hasSel} onClick={() => medDownloadReport({ suc, type, meters: shown, M, records: state.records })}>Descargar reporte</Btn>
+        <Btn icon="file_download" disabled={!hasSel} onClick={() => medDownloadReport({ suc, type, meters: shown, M, records: state.records, state })}>Descargar reporte</Btn>
       </div>
 
       {!hasSel ? (
@@ -907,7 +907,7 @@ function medExportExcel(M, records, dispatch) {
 // Descargable "Estado de medidores" — reporte HTML (print → PDF)
 // Usa el período seleccionado en el toolbar. Inspirado en el diseño de referencia.
 // ============================================================
-function medDownloadReport({ suc, type, meters, M, records }) {
+function medDownloadReport({ suc, type, meters, M, records, state }) {
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const unit = medUnit(type);
   const typeLbl = MED_TYPES[type] ? MED_TYPES[type].label : type;
@@ -975,14 +975,88 @@ function medDownloadReport({ suc, type, meters, M, records }) {
   const th = (label, extra) => `<th colspan="3" style="text-align:center;padding:6px 8px;font-size:10.5px;font-weight:700;color:#0069A6;background:#E6F4FB;border-left:1px solid #E4E7EC;">${label}</th>`;
   const subTh = () => `<th style="text-align:right;padding:6px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:2px solid #0069A6;border-left:1px solid #E4E7EC;">Lectura</th><th style="text-align:right;padding:6px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:2px solid #0069A6;">Consumo</th><th style="text-align:right;padding:6px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:2px solid #0069A6;">Costo</th>`;
 
-  const detBody = rows.map(r => `<tr>
+  // Con más de 3 meses las columnas (3 por mes) exceden el ancho A4: el
+  // detalle se parte en bloques de 3 meses, una tabla apilada por bloque.
+  const DET_CHUNK = 3;
+  const detChunks = [];
+  const repIdx = rep.map((mk, ci) => ({ mk, ci }));
+  for (let i = 0; i < repIdx.length; i += DET_CHUNK) detChunks.push(repIdx.slice(i, i + DET_CHUNK));
+  const detTable = (chunk) => {
+    const body = rows.map(r => `<tr>
     <td style="text-align:left;padding:9px 10px;border-bottom:1px solid #EEE;"><span style="font-weight:700;color:#101828;">${esc(r.m.nombre)}</span>${r.m.numero ? ` <span style="color:#919599;">· N° ${esc(r.m.numero)}</span>` : ""}</td>
-    ${r.cells.map(c => `<td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;color:#667085;border-left:1px solid #E4E7EC;">${num(c.lect)}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;font-weight:600;color:#101828;">${num(c.cons)}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;color:#344054;">${money(c.costo)}</td>`).join("")}
+    ${chunk.map(({ ci }) => r.cells[ci]).map(c => `<td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;color:#667085;border-left:1px solid #E4E7EC;">${num(c.lect)}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;font-weight:600;color:#101828;">${num(c.cons)}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #EEE;color:#344054;">${money(c.costo)}</td>`).join("")}
   </tr>`).join("");
-  const detTot = `<tr style="background:#F9FAFB;"><td style="text-align:left;padding:10px;font-weight:700;color:#101828;border-top:2px solid #0069A6;">Totales</td>${rep.map((mk, ci) => `<td style="text-align:right;padding:10px 8px;color:#919599;border-top:2px solid #0069A6;border-left:1px solid #E4E7EC;">—</td><td style="text-align:right;padding:10px 8px;font-weight:700;color:#0069A6;border-top:2px solid #0069A6;">${anyCons[ci] ? fmtNum(totCons[ci]) : "—"}</td><td style="text-align:right;padding:10px 8px;font-weight:700;color:#101828;border-top:2px solid #0069A6;">${fmtCLP(totCosto[ci])}</td>`).join("")}</tr>`;
+    const tot = `<tr style="background:#F9FAFB;"><td style="text-align:left;padding:10px;font-weight:700;color:#101828;border-top:2px solid #0069A6;">Totales</td>${chunk.map(({ ci }) => `<td style="text-align:right;padding:10px 8px;color:#919599;border-top:2px solid #0069A6;border-left:1px solid #E4E7EC;">—</td><td style="text-align:right;padding:10px 8px;font-weight:700;color:#0069A6;border-top:2px solid #0069A6;">${anyCons[ci] ? fmtNum(totCons[ci]) : "—"}</td><td style="text-align:right;padding:10px 8px;font-weight:700;color:#101828;border-top:2px solid #0069A6;">${fmtCLP(totCosto[ci])}</td>`).join("")}</tr>`;
+    return `<table style="font-size:10.5px;"><thead>
+      <tr><th rowspan="2" style="text-align:left;vertical-align:bottom;padding:8px 10px;font-size:11px;font-weight:700;color:#344054;border-bottom:2px solid #0069A6;">Medidor</th>${chunk.map(({ mk }) => th(monthLabelShort(mk))).join("")}</tr>
+      <tr>${chunk.map(() => subTh()).join("")}</tr>
+    </thead><tbody>${body}${tot}</tbody></table>`;
+  };
+  const detTables = detChunks.map(detTable).join(`<div style="height:12px;"></div>`);
 
-  const payHead = rep.map(mk => `<th style="text-align:center;padding:8px;font-size:10.5px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">${monthLabelShort(mk)}</th>`).join("");
-  const payBody = rows.map(r => `<tr><td style="text-align:left;padding:9px 10px;border-bottom:1px solid #EEE;font-weight:700;color:#101828;">${esc(r.m.nombre)}${r.m.numero ? ` <span style="color:#919599;font-weight:400;">· N° ${esc(r.m.numero)}</span>` : ""}</td>${r.cells.map(c => `<td style="text-align:center;padding:9px 8px;border-bottom:1px solid #EEE;">${payChip(c.pay)}</td>`).join("")}</tr>`).join("");
+  // Estado de pagos: mismo problema de ancho con muchos meses — bloques de 6.
+  const PAY_CHUNK = 6;
+  const payChunks = [];
+  for (let i = 0; i < repIdx.length; i += PAY_CHUNK) payChunks.push(repIdx.slice(i, i + PAY_CHUNK));
+  const payTable = (chunk) => {
+    const head = chunk.map(({ mk }) => `<th style="text-align:center;padding:8px;font-size:10.5px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">${monthLabelShort(mk)}</th>`).join("");
+    const body = rows.map(r => `<tr><td style="text-align:left;padding:9px 10px;border-bottom:1px solid #EEE;font-weight:700;color:#101828;">${esc(r.m.nombre)}${r.m.numero ? ` <span style="color:#919599;font-weight:400;">· N° ${esc(r.m.numero)}</span>` : ""}</td>${chunk.map(({ ci }) => r.cells[ci]).map(c => `<td style="text-align:center;padding:9px 8px;border-bottom:1px solid #EEE;">${payChip(c.pay)}</td>`).join("")}</tr>`).join("");
+    return `<table style="font-size:10.5px;"><thead><tr><th style="text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">Medidor</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  };
+  const payTables = payChunks.map(payTable).join(`<div style="height:12px;"></div>`);
+
+  // ----- Impacto ambiental (GEI) -----
+  // Factor según configuración de la sucursal (override sucursal > empresa,
+  // igual que el módulo Impacto). Combustible: requiere que la sucursal tenga
+  // UNA subcategoría configurada (los medidores no registran subcategoría).
+  const impSucCfg = ((state && state.configSucursales) || []).find(s => s.nombre === suc);
+  const impSucId = impSucCfg ? impSucCfg.id : null;
+  const impConsumoTotal = totCons.reduce((a, b) => a + b, 0);
+  let impKey = null, impError = null;
+  if (type === "combustible") {
+    const subs = (typeof getSubcatsFor === "function" && state) ? (getSubcatsFor(state, "combustible", suc) || []) : [];
+    if (!subs.length) impError = "La sucursal no tiene una subcategoría de combustible configurada. Configúrala en Configuración → sucursal para habilitar el cálculo.";
+    else if (subs.length > 1) impError = "La sucursal tiene varias subcategorías de combustible configuradas (" + subs.map(s => s.label).join(", ") + "), por lo que no es posible asignar un factor de emisión único al consumo de los medidores.";
+    else impKey = subs[0].id;
+  } else {
+    impKey = type;
+  }
+  const impDef = (!impError && state && state.emissions.factoresEmpresa[impKey]) || null;
+  const impVal = (!impError && state && typeof factorFor === "function") ? factorFor(state, impSucId, impKey) : null;
+  const impSinFactorSuc = (type === "electricidad" && state && typeof sucSinFactorIds === "function" && impSucId != null && sucSinFactorIds(state).includes(impSucId));
+  if (!impError && impSinFactorSuc) impError = "La sucursal reporta electricidad en un sistema eléctrico distinto del SEN y no tiene factor de emisión configurado.";
+  if (!impError && impVal == null) impError = "No hay factor de emisión configurado para este consumo. Configúralo en Impacto → Factores de emisión.";
+  const impScope = impDef ? impDef.scope : (type === "electricidad" ? 2 : type === "agua" ? 3 : 1);
+  const impScopeMeta = (typeof SCOPES !== "undefined" && SCOPES[impScope]) ? SCOPES[impScope] : { label: "Alcance " + impScope, desc: "" };
+  const impKg = impError ? null : impConsumoTotal * impVal;
+  const impCustom = (!impError && typeof isCustomFactor === "function") ? isCustomFactor(state, impSucId, impKey) : false;
+  const impScopeChip = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;background:#E6F4FB;color:#0069A6;">${esc(impScopeMeta.label)}${impScopeMeta.desc ? " · " + esc(impScopeMeta.desc) : ""}</span>`;
+  const impBlock = impError
+    ? `<div style="background:#FFFAEB;border:1px solid #FEDF89;border-radius:8px;padding:12px 14px;font-size:11.5px;color:#B54708;"><strong>No fue posible calcular las emisiones.</strong> ${esc(impError)}</div>`
+    : `<div style="display:flex;gap:10px;align-items:stretch;">
+      <div style="flex:1.2;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:15px 16px;">
+        <div style="font-size:11px;font-weight:600;color:#166534;">Emisiones GEI del periodo</div>
+        <div style="font:700 25px/1.1 var(--rl-font-display);color:#14532D;margin-top:8px;">${fmtNum(impKg)}<span style="font-size:13px;font-weight:600;margin-left:5px;">kgCO₂e</span></div>
+        <div style="margin-top:8px;">${impScopeChip}</div>
+      </div>
+      <div style="flex:2;border:1px solid #E4E7EC;border-radius:10px;padding:13px 16px;">
+        <div style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#919599;font-weight:700;margin-bottom:8px;">Factor de emisión aplicado</div>
+        <table style="font-size:10.5px;"><thead><tr>
+          <th style="text-align:left;padding:5px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:1px solid #E4E7EC;">Factor</th>
+          <th style="text-align:right;padding:5px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:1px solid #E4E7EC;">Valor</th>
+          <th style="text-align:center;padding:5px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:1px solid #E4E7EC;">Alcance</th>
+          <th style="text-align:left;padding:5px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:1px solid #E4E7EC;">Fuente</th>
+          <th style="text-align:left;padding:5px 8px;font-size:9.5px;font-weight:600;color:#727272;border-bottom:1px solid #E4E7EC;">Origen</th>
+        </tr></thead><tbody><tr>
+          <td style="text-align:left;padding:7px 8px;font-weight:700;color:#101828;">${esc(impDef ? impDef.label : impKey)}</td>
+          <td style="text-align:right;padding:7px 8px;font-weight:600;color:#101828;">${String(impVal).replace(".", ",")} ${esc(impDef ? impDef.unit : "kgCO₂e/" + unit)}</td>
+          <td style="text-align:center;padding:7px 8px;color:#344054;">${esc(impScopeMeta.label)}</td>
+          <td style="text-align:left;padding:7px 8px;color:#667085;">${esc(impDef && impDef.fuente ? impDef.fuente : "—")}</td>
+          <td style="text-align:left;padding:7px 8px;color:#667085;">${impCustom ? "Personalizado sucursal" : "Empresa"}</td>
+        </tr></tbody></table>
+        <div style="font-size:10px;color:#919599;margin-top:8px;">Cálculo: ${fmtNum(impConsumoTotal)} ${esc(unit)} × ${String(impVal).replace(".", ",")} ${esc(impDef ? impDef.unit : "")} = ${fmtNum(impKg)} kgCO₂e</div>
+      </div>
+    </div>`;
 
   const difChip = dif == null
     ? `<span style="font-size:13px;font-weight:700;color:#919599;">Sin boleta registrada</span>`
@@ -1031,17 +1105,21 @@ function medDownloadReport({ suc, type, meters, M, records }) {
   </div>
   <div style="margin-top:16px;">
     <div style="font:600 15px/1.3 var(--rl-font-display);color:#101828;margin-bottom:9px;">Detalle por medidor</div>
-    <table style="font-size:10.5px;"><thead>
-      <tr><th rowspan="2" style="text-align:left;vertical-align:bottom;padding:8px 10px;font-size:11px;font-weight:700;color:#344054;border-bottom:2px solid #0069A6;">Medidor</th>${rep.map(mk => th(monthLabelShort(mk))).join("")}</tr>
-      <tr>${rep.map(() => subTh()).join("")}</tr>
-    </thead><tbody>${detBody}${detTot}</tbody></table>
+    ${detTables}
     <div style="font-size:10px;color:#919599;margin-top:8px;">Lectura y consumo en ${unit} · Costos en pesos chilenos (CLP).</div>
   </div>
   <div style="margin-top:16px;">
     <div style="font:600 15px/1.3 var(--rl-font-display);color:#101828;margin-bottom:9px;">Estado de pagos</div>
-    <table style="font-size:10.5px;"><thead><tr><th style="text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">Medidor</th>${payHead}</tr></thead><tbody>${payBody}</tbody></table>
+    ${payTables}
   </div>
-  <div style="border-top:1px solid #E4E7EC;padding-top:8px;margin-top:14px;display:flex;justify-content:space-between;font-size:10px;color:#919599;"><span>Documento generado automáticamente por Recylink Labs · Módulo de Medidores</span><span>Generado el ${fechaLarga}</span></div>
+  <div style="margin-top:16px;">
+    <div style="font:600 15px/1.3 var(--rl-font-display);color:#101828;margin-bottom:9px;">Impacto ambiental</div>
+    ${impBlock}
+    <div style="background:#F9FAFB;border:1px solid #E4E7EC;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:10.5px;line-height:1.55;color:#475467;">
+      <strong style="color:#344054;">¿Qué significa kgCO₂e?</strong> Los kilogramos de dióxido de carbono equivalente (kgCO₂e) son la unidad estándar para medir la huella de carbono: expresa el efecto de todos los gases de efecto invernadero (CO₂, CH₄, N₂O, entre otros) como la cantidad de CO₂ que produciría el mismo calentamiento global. Esto permite sumar y comparar emisiones de distintas fuentes en una sola cifra. El alcance indica dónde se generan: Alcance 1 son emisiones directas (ej. combustión propia), Alcance 2 la energía comprada (ej. electricidad) y Alcance 3 otras emisiones indirectas de la cadena de valor (ej. agua potable).
+    </div>
+  </div>
+  <div style="border-top:1px solid #E4E7EC;padding-top:8px;margin-top:14px;display:flex;justify-content:space-between;font-size:10px;color:#919599;"><span>Documento generado automáticamente por Recylink</span><span>Generado el ${fechaLarga}</span></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
