@@ -99,7 +99,7 @@ const Landing = () => {
                       {(r.provider || "—")} · {fmtNum(r.cantidad)} {r.unit}
                     </div>
                   </div>
-                  <div className="rc-home-item-time">{landingRelativeDate(r.date)}</div>
+                  <div className="rc-home-item-time">{fmtMonth(r.date)}</div>
                 </div>
               );
             })}

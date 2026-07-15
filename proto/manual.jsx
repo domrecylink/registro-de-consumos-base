@@ -3,7 +3,7 @@
 // ---- Validation -----
 function validateManual(d, state) {
   const errors = { entries: {} };
-  if (!d.date) errors.date = "Indica la fecha.";
+  if (!d.date) errors.date = "Indica el mes.";
   if (!d.sucursal) errors.sucursal = "Elige una sucursal.";
   (d.entries || []).forEach((e) => {
     const ee = {};
@@ -279,8 +279,8 @@ const ManualForm = () => {
       <Card style={{ marginBottom: 18 }}>
         <div className="prt-eyebrow" style={{ marginBottom: 12 }}>Datos compartidos del lote</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <Field label="Fecha del consumo" required error={errs.date}>
-            <DatePicker value={d.date} onChange={v => setShared("date", v)} max={todayISO()} error={!!errs.date} />
+          <Field label="Mes del consumo" required error={errs.date}>
+            <Input type="month" value={d.date} onChange={v => setShared("date", v)} max={currentMonthISO()} error={!!errs.date} />
           </Field>
           <Field label="Sucursal" required error={errs.sucursal}>
             <Select
@@ -366,8 +366,8 @@ const ManualPreview = () => {
         <div className="prt-eyebrow" style={{ marginBottom: 10 }}>Datos del lote</div>
         <div className="prt-row" style={{ gap: 28, flexWrap: "wrap" }}>
           <div>
-            <div className="prt-hint">Fecha</div>
-            <div style={{ font: "600 15px/1 var(--rl-font-display)", marginTop: 2 }}>{fmtDate(d.date)}</div>
+            <div className="prt-hint">Mes</div>
+            <div style={{ font: "600 15px/1 var(--rl-font-display)", marginTop: 2 }}>{fmtMonth(d.date)}</div>
           </div>
           <div>
             <div className="prt-hint">Sucursal</div>

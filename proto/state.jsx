@@ -353,7 +353,8 @@ function reducer(state, action) {
       const facturas = (typeof window !== "undefined") ? (window.__rcManualFacturas || {}) : {};
       const newRecs = d.entries.map(e => ({
         id: nextId(),
-        date: d.date,
+        // manual pide mes (YYYY-MM) → se guarda día 15, punto medio del mes
+        date: d.date && d.date.length === 7 ? d.date + "-15" : d.date,
         sucursal: d.sucursal,
         type: e.type,
         subcat: e.subcat || null,
@@ -874,6 +875,11 @@ function fmtDate(iso) {
   const [y,m,d] = iso.split("-");
   return `${d}/${m}/${y.slice(2)}`;
 }
+// Mes de un registro — "2025-05-15" o "2025-05" → "may 25".
+function fmtMonth(iso) {
+  if (!iso || String(iso).length < 7) return "—";
+  return monthLabelShort(String(iso).slice(0, 7));
+}
 // Format an ISO-ish datetime ("2026-06-25T09:35:12.345Z" o "2026-06-25 09:35:12")
 // to "DD/MM/YY HH:mm" en horario local. Devuelve "—" si no parsea.
 function fmtDateTime(s) {
@@ -1115,7 +1121,7 @@ Object.assign(window, {
   SCOPES, EMISSION_FACTOR_CATALOG, REFRIGERANTES_CATALOG,
   months, nextId,
   CURRENT_MONTH_KEY, PREV_MONTH_KEY,
-  fmtCLP, fmtNum, fmtTon, fmtDate, fmtDateTime, monthLabelShort,
+  fmtCLP, fmtNum, fmtTon, fmtDate, fmtMonth, fmtDateTime, monthLabelShort,
   periodToMonthKeys, periodLabel, monthKeysInRange, parseCustomPeriod, subcatLabel, activeSucNames, getSubcatsFor,
   combustibleSubcatFromConfig, getEntryUnit,
   getConfiguredProvider, getProviderOptionsFor,

@@ -701,7 +701,7 @@ const RecentTable = () => {
       dispatch({ type: "TOAST/SHOW", toast: {
         kind: "success",
         title: field === "cantidad" ? "Cantidad actualizada" : "Costo actualizado",
-        body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtDate(rec.date)} · ${fmtNum(rec[field])} → ${fmtNum(parsed)}${field === "cantidad" ? " " + rec.unit : ""}`,
+        body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtMonth(rec.date)} · ${fmtNum(rec[field])} → ${fmtNum(parsed)}${field === "cantidad" ? " " + rec.unit : ""}`,
         undoAction: () => dispatch({ type: "DASH/UNDO_EDIT" }),
       }});
     } else if (field === "subcat") {
@@ -717,14 +717,16 @@ const RecentTable = () => {
       try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field: "provider", value: v } })); } catch(e) {}
       dispatch({ type: "TOAST/SHOW", toast: { kind: "success", title: "Proveedor actualizado", body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${v || "—"}` } });
     } else if (field === "date") {
-      const iso = String(value || "").slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || rec.date === iso) { setEditing(null); return; }
+      // El editor entrega un mes (YYYY-MM); se guarda día 15, punto medio del mes.
+      const mk = String(value || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(mk) || String(rec.date).slice(0, 7) === mk) { setEditing(null); return; }
+      const iso = mk + "-15";
       dispatch({ type: "DASH/EDIT_RECORD", id, patch: { date: iso } });
       try { window.dispatchEvent(new CustomEvent("rc:edit", { detail: { id, field: "date", value: iso } })); } catch(e) {}
       dispatch({ type: "TOAST/SHOW", toast: {
         kind: "success",
-        title: "Fecha actualizada",
-        body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtDate(rec.date)} → ${fmtDate(iso)}`,
+        title: "Mes actualizado",
+        body: `${rec.sucursal} · ${TYPES[rec.type].label} · ${fmtMonth(rec.date)} → ${fmtMonth(iso)}`,
         undoAction: () => dispatch({ type: "DASH/UNDO_EDIT" }),
       }});
     }
@@ -801,7 +803,7 @@ const RecentTable = () => {
         <table className="prt-table">
           <thead>
             <tr>
-              <SortableTh keyId="date"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Fecha</SortableTh>
+              <SortableTh keyId="date"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Mes</SortableTh>
               <SortableTh keyId="sucursal" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Sucursal</SortableTh>
               <SortableTh keyId="type"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Tipo</SortableTh>
               <SortableTh keyId="subcat"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>Subcategoría</SortableTh>
@@ -830,7 +832,7 @@ const RecentTable = () => {
                   >
                     {editing && editing.id === r.id && editing.field === "date"
                       ? <DateEditCell defaultValue={r.date} onCommit={(v) => commitEdit(r.id, "date", v)} onCancel={() => setEditing(null)} />
-                      : fmtDate(r.date)}
+                      : fmtMonth(r.date)}
                   </td>
                   <td className={isDel ? "td-del" : ""}>{r.sucursal}</td>
                   <td><TypeIndicator type={r.type} withLabel /></td>
@@ -1003,7 +1005,7 @@ const RecentTable = () => {
           detail={
             <div>
               <div><strong>{confirmModal.rec.sucursal}</strong> · {TYPES[confirmModal.rec.type].label}</div>
-              <div>{fmtDate(confirmModal.rec.date)} · {fmtNum(confirmModal.rec.cantidad)} {confirmModal.rec.unit} · {fmtCLP(confirmModal.rec.costo)}</div>
+              <div>{fmtMonth(confirmModal.rec.date)} · {fmtNum(confirmModal.rec.cantidad)} {confirmModal.rec.unit} · {fmtCLP(confirmModal.rec.costo)}</div>
             </div>
           }
           actions={<>
@@ -1022,7 +1024,7 @@ const RecentTable = () => {
           detail={
             <div>
               <div><strong>{confirmModal.rec.sucursal}</strong> · {TYPES[confirmModal.rec.type].label}</div>
-              <div>{fmtDate(confirmModal.rec.date)} · {fmtNum(confirmModal.rec.cantidad)} {confirmModal.rec.unit} · {fmtCLP(confirmModal.rec.costo)}</div>
+              <div>{fmtMonth(confirmModal.rec.date)} · {fmtNum(confirmModal.rec.cantidad)} {confirmModal.rec.unit} · {fmtCLP(confirmModal.rec.costo)}</div>
             </div>
           }
           actions={<>
@@ -1119,15 +1121,15 @@ const EditCell = ({ defaultValue, onCommit, onCancel, align }) => {
   );
 };
 
-// Editor inline de fecha (input date nativo → ISO YYYY-MM-DD). max = hoy.
+// Editor inline de mes (input month nativo → YYYY-MM). max = mes actual.
 const DateEditCell = ({ defaultValue, onCommit, onCancel }) => {
-  const [v, setV] = React.useState(String(defaultValue || "").slice(0, 10));
+  const [v, setV] = React.useState(String(defaultValue || "").slice(0, 7));
   return (
     <input
-      type="date"
+      type="month"
       value={v}
       autoFocus
-      max={todayISO()}
+      max={currentMonthISO()}
       onChange={e => setV(e.target.value)}
       onBlur={() => onCommit(v)}
       onKeyDown={e => {

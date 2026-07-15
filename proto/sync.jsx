@@ -637,8 +637,9 @@ function endOfMonth(iso) {
   const last = new Date(y, m, 0).getDate();
   return String(last).padStart(2, "0") + "/" + String(m).padStart(2, "0") + "/" + y;
 }
-// Para registros manuales — escribe la fecha tal cual la eligió el usuario en
-// formato DD-MM-YY (orden D-M-Y explícito, 2 dígitos de año).
+// Para registros manuales — el usuario elige un mes y se guarda día 15
+// (punto medio del mes); se escribe en formato DD-MM-YY (orden D-M-Y
+// explícito, 2 dígitos de año).
 function fmtDDMMYY(iso) {
   if (!iso) return "";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
