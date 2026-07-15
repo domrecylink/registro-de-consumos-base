@@ -299,6 +299,142 @@ const DatePicker = ({ value, onChange, max, min, error, placeholder }) => {
   );
 };
 
+// ---- MonthPicker ----
+// Selector de mes custom en popover — mismo idioma visual que DatePicker:
+// trigger completo clickeable estilizado como prt-input, grilla de 12 meses,
+// navegación por año. value: "YYYY-MM" o "". max/min: "YYYY-MM".
+// Mes seleccionado: fondo primary-100 + texto primary-900. Mes actual (no
+// seleccionado): borde primary-200 sutil. Footer: "Borrar" y "Mes actual".
+const MonthPicker = ({ value, onChange, max, min, error, placeholder }) => {
+  const [open, setOpen] = React.useState(false);
+  const rootRef = React.useRef(null);
+  const curMonth = currentMonthISO();
+  const initialYear = (value && /^\d{4}-\d{2}$/.test(value)) ? +value.slice(0, 4) : +curMonth.slice(0, 4);
+  const [viewYear, setViewYear] = React.useState(initialYear);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (value && /^\d{4}-\d{2}$/.test(value)) setViewYear(+value.slice(0, 4));
+    const onDoc = (e) => {
+      if (!rootRef.current) return;
+      if (!rootRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, value]);
+
+  const MESES_MP = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+  const pickMonth = (m) => {
+    const mk = `${viewYear}-${String(m).padStart(2, "0")}`;
+    if (max && mk > max) return;
+    if (min && mk < min) return;
+    onChange && onChange(mk);
+    setOpen(false);
+  };
+
+  const displayValue = (mk) => {
+    if (!mk || !/^\d{4}-\d{2}/.test(mk)) return placeholder || "Elige un mes…";
+    const name = new Date(+mk.slice(0, 4), +mk.slice(5, 7) - 1, 1)
+      .toLocaleString("es-CL", { month: "long", year: "numeric" });
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+
+  const curDisabled = (max && curMonth > max) || (min && curMonth < min);
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={"prt-input" + (error ? " error" : "")}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          textAlign: "left", cursor: "pointer",
+        }}
+      >
+        <Icon name="calendar_today" size={16} style={{ opacity: 0.6, flexShrink: 0 }} />
+        <span style={{ flex: 1, color: value ? "var(--rl-gray-900)" : "var(--rl-gray-400)", font: value ? "500 14px/1 var(--rl-font-body)" : "400 14px/1 var(--rl-font-body)" }}>
+          {displayValue(value)}
+        </span>
+        <Icon name="expand_more" size={16} style={{ opacity: 0.55, flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 30,
+            background: "#fff", border: "1px solid var(--rl-gray-200)", borderRadius: 12,
+            boxShadow: "0 16px 36px rgba(16,24,40,0.12)",
+            padding: 14, width: 280,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button
+              type="button" onClick={() => setViewYear(y => y - 1)}
+              style={{ all: "unset", cursor: "pointer", width: 32, height: 32, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--rl-gray-700)" }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--rl-gray-50)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              aria-label="Año anterior"
+            ><Icon name="chevron_left" size={18} /></button>
+            <div style={{ font: "600 14px/1 var(--rl-font-display)", color: "var(--rl-gray-900)" }}>{viewYear}</div>
+            <button
+              type="button" onClick={() => setViewYear(y => y + 1)}
+              style={{ all: "unset", cursor: "pointer", width: 32, height: 32, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--rl-gray-700)" }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--rl-gray-50)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              aria-label="Año siguiente"
+            ><Icon name="chevron_right" size={18} /></button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {MESES_MP.map((name, i) => {
+              const mk = `${viewYear}-${String(i + 1).padStart(2, "0")}`;
+              const isCur = mk === curMonth;
+              const isSel = mk === value;
+              const disabled = (max && mk > max) || (min && mk < min);
+              return (
+                <button
+                  key={mk} type="button" disabled={disabled}
+                  onClick={() => pickMonth(i + 1)}
+                  onMouseEnter={(e) => { if (!disabled && !isSel) e.currentTarget.style.background = "var(--rl-gray-50)"; }}
+                  onMouseLeave={(e) => { if (!disabled && !isSel) e.currentTarget.style.background = "transparent"; }}
+                  aria-pressed={isSel}
+                  style={{
+                    all: "unset",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    boxSizing: "border-box", width: "100%", height: 40,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 8,
+                    border: isCur && !isSel ? "1.5px solid var(--rl-primary-300, #7CB3D6)" : "1.5px solid transparent",
+                    background: isSel ? "var(--rl-primary-100, #D4E7F4)" : "transparent",
+                    color: disabled ? "var(--rl-gray-300)"
+                         : isSel ? "var(--rl-primary-900)"
+                         : isCur ? "var(--rl-primary-900)"
+                         : "var(--rl-gray-800)",
+                    font: (isSel ? 700 : 500) + " 13px/1 var(--rl-font-body)",
+                    transition: "background 90ms",
+                  }}
+                >{name}</button>
+              );
+            })}
+          </div>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--rl-gray-100)",
+          }}>
+            <Btn size="sm" kind="ghost" onClick={() => { onChange && onChange(""); setOpen(false); }}>Borrar</Btn>
+            <Btn size="sm" kind="ghost" disabled={curDisabled} onClick={() => { onChange && onChange(curMonth); setOpen(false); }}>Mes actual</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Hoy en ISO local (YYYY-MM-DD) y mes actual (YYYY-MM). Para cap de inputs
 // date/month que no deben permitir futuro.
 function todayISO() {
@@ -600,7 +736,7 @@ const ToastHost = () => {
 };
 
 Object.assign(window, {
-  Btn, Field, Input, NumericInput, Select, IconSelect, DatePicker, Chip, TypeIndicator,
+  Btn, Field, Input, NumericInput, Select, IconSelect, DatePicker, MonthPicker, Chip, TypeIndicator,
   Card, SectionHead, Steps, EmptyState, ToastHost,
   todayISO, currentMonthISO,
 });

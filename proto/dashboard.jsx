@@ -1122,13 +1122,20 @@ const EditCell = ({ defaultValue, onCommit, onCancel, align }) => {
 };
 
 // Editor inline de mes (input month nativo → YYYY-MM). max = mes actual.
+// showPicker(): abre el desplegable al entrar a editar y al clickear cualquier
+// parte del input (no solo el icono de calendario).
 const DateEditCell = ({ defaultValue, onCommit, onCancel }) => {
   const [v, setV] = React.useState(String(defaultValue || "").slice(0, 7));
+  const ref = React.useRef(null);
+  const openPicker = () => { try { ref.current && ref.current.showPicker(); } catch (e) {} };
+  React.useEffect(openPicker, []);
   return (
     <input
+      ref={ref}
       type="month"
       value={v}
       autoFocus
+      onClick={openPicker}
       max={currentMonthISO()}
       onChange={e => setV(e.target.value)}
       onBlur={() => onCommit(v)}

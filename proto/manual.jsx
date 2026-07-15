@@ -280,7 +280,7 @@ const ManualForm = () => {
         <div className="prt-eyebrow" style={{ marginBottom: 12 }}>Datos compartidos del lote</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Field label="Mes del consumo" required error={errs.date}>
-            <Input type="month" value={d.date} onChange={v => setShared("date", v)} max={currentMonthISO()} error={!!errs.date} />
+            <MonthPicker value={d.date} onChange={v => setShared("date", v)} max={currentMonthISO()} error={!!errs.date} />
           </Field>
           <Field label="Sucursal" required error={errs.sucursal}>
             <Select
