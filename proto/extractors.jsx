@@ -41,12 +41,33 @@ async function rcPdfText(file) {
   return { flat, lined, combined: flat + "\n" + lined };
 }
 
+// ----- Período facturado → punto medio -------------------------------------
+// El mes del Registro es el mes predominante del período de lectura; el punto
+// medio del período siempre cae en él. Devuelve null si el par no parece un
+// ciclo de facturación real (mensual/bimestral).
+function rcPeriodoMedio(sIni, sFin) {
+  const parse = (s) => {
+    const [d, m, y] = s.split("/").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const a = parse(sIni), b = parse(sFin);
+  if (isNaN(a) || isNaN(b)) return null;
+  const dias = (b - a) / 86400000;
+  if (dias < 15 || dias > 62) return null;
+  const mid = new Date((a.getTime() + b.getTime()) / 2);
+  const iso = (dt) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  return { inicio: iso(a), fin: iso(b), media: iso(mid) };
+}
+
 // ----- Enel parser (replica del notebook) ---------------------------------
 function rcExtraerEnel(textBundle) {
   const texto = textBundle.combined;
   const out = {
     numeroCliente: "",
     fecha: "",
+    periodoInicio: "",
+    periodoFin: "",
     consumo: 0,
     costo: 0,
   };
@@ -63,12 +84,33 @@ function rcExtraerEnel(textBundle) {
   const cliente = candidatos.find(x => /^\d{6,7}-[\dkK]$/.test(x)) || candidatos[0];
   if (cliente) out.numeroCliente = cliente;
 
-  // B. Fecha de Lectura
-  let mFecha = texto.match(/Desde\s+(\d{2}\/\d{2}\/\d{4})/i);
-  if (!mFecha) mFecha = texto.match(/(\d{2}\/\d{2}\/\d{4})/);
-  if (mFecha) {
-    const [d, m, y] = mFecha[1].split("/");
-    out.fecha = `${y}-${m}-${d}`;
+  // B. Período de lectura → fecha = punto medio (mes predominante).
+  // En el text layer las etiquetas "Desde"/"Hasta" quedan en una línea
+  // distinta a las fechas, así que no se puede anclar a la etiqueta: el par
+  // de fechas adyacentes es el período de lectura.
+  let periodo = null;
+  const mDesde = texto.match(/Desde\s*(\d{2}\/\d{2}\/\d{4})\s*(?:Hasta\s*)?(\d{2}\/\d{2}\/\d{4})/i);
+  if (mDesde) periodo = rcPeriodoMedio(mDesde[1], mDesde[2]);
+  if (!periodo) {
+    const rePar = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})/g;
+    let mPar;
+    while ((mPar = rePar.exec(texto))) {
+      periodo = rcPeriodoMedio(mPar[1], mPar[2]);
+      if (periodo) break;
+    }
+  }
+  if (periodo) {
+    out.fecha = periodo.media;
+    out.periodoInicio = periodo.inicio;
+    out.periodoFin = periodo.fin;
+  } else {
+    // Fallback legado: alguna fecha suelta de la boleta.
+    let mFecha = texto.match(/Desde\s+(\d{2}\/\d{2}\/\d{4})/i);
+    if (!mFecha) mFecha = texto.match(/(\d{2}\/\d{2}\/\d{4})/);
+    if (mFecha) {
+      const [d, m, y] = mFecha[1].split("/");
+      out.fecha = `${y}-${m}-${d}`;
+    }
   }
 
   // C. Consumo
@@ -129,7 +171,7 @@ function rcExtraerEnel(textBundle) {
 function rcExtraerCGE(textBundle) {
   const texto = textBundle.combined;
   const linedTexto = textBundle.lined;
-  const out = { numeroCliente: "", fecha: "", consumo: 0, costo: 0 };
+  const out = { numeroCliente: "", fecha: "", periodoInicio: "", periodoFin: "", consumo: 0, costo: 0 };
 
   // N° Cliente. La boleta CGE es de DOBLE COLUMNA y pdf.js agrupa el texto por
   // coordenada Y, por lo que mezcla la columna izquierda con la derecha y rompe
@@ -156,11 +198,18 @@ function rcExtraerCGE(textBundle) {
     if (cand) out.numeroCliente = cand;
   }
 
-  // Fecha: fin del período de lectura.
-  const mFecha = texto.match(/Per[ií]odo de lectura:\s*\d{2}\/\d{2}\/\d{4}\s*-\s*(\d{2}\/\d{2}\/\d{4})/i);
+  // Fecha: punto medio del período de lectura (mes predominante).
+  const mFecha = texto.match(/Per[ií]odo de lectura:\s*(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})/i);
   if (mFecha) {
-    const [d, m, y] = mFecha[1].split("/");
-    out.fecha = `${y}-${m}-${d}`;
+    const periodo = rcPeriodoMedio(mFecha[1], mFecha[2]);
+    if (periodo) {
+      out.fecha = periodo.media;
+      out.periodoInicio = periodo.inicio;
+      out.periodoFin = periodo.fin;
+    } else {
+      const [d, m, y] = mFecha[2].split("/");
+      out.fecha = `${y}-${m}-${d}`;
+    }
   }
 
   // Consumo en kWh — preferir "Consumo total del mes", fallback al patrón Enel.
@@ -180,24 +229,46 @@ function rcExtraerCGE(textBundle) {
 }
 
 // ----- Aguas Andinas parser ----------------------------------------------
+const RC_MESES_CL = { ENE:"01", FEB:"02", MAR:"03", ABR:"04", MAY:"05", JUN:"06",
+                      JUL:"07", AGO:"08", SEP:"09", OCT:"10", NOV:"11", DIC:"12" };
+// "28-MAY-2025" → "28/05/2025" (formato que espera rcPeriodoMedio)
+function rcFechaMesNombre(dia, mesStr, anio) {
+  return `${dia}/${RC_MESES_CL[mesStr.toUpperCase()] || "01"}/${anio}`;
+}
+
 function rcExtraerAguas(textBundle) {
   const texto = textBundle.combined;
-  const out = { numeroCliente: "", fecha: "", consumo: 0, costo: 0 };
+  const out = { numeroCliente: "", fecha: "", periodoInicio: "", periodoFin: "", consumo: 0, costo: 0 };
 
   let mCli = texto.match(/Cuenta es:\s*\n*\s*([0-9\-]+)/i);
   if (!mCli) mCli = texto.match(/cuenta[^\d]*([0-9\-]+)/i);
   if (!mCli) mCli = texto.match(/Nro de cuenta[^\d]*(\d+-[0-9Kk])/i);
   if (mCli) out.numeroCliente = mCli[1].trim();
 
-  // Fecha: VENCIMIENTO → fallback LECTURA ACTUAL (igual que el notebook).
-  let mFecha = texto.match(/VENCIMIENTO\s+(\d{2})-([A-Za-z]{3})-(\d{4})/i);
-  if (!mFecha) mFecha = texto.match(/LECTURA ACTUAL\s+(\d{2})-([A-Za-z]{3})-(\d{4})/i);
-  if (mFecha) {
-    const meses = { ENE:"01", FEB:"02", MAR:"03", ABR:"04", MAY:"05", JUN:"06",
-                    JUL:"07", AGO:"08", SEP:"09", OCT:"10", NOV:"11", DIC:"12" };
-    const [, dia, mesStr, anio] = mFecha;
-    const mes = meses[mesStr.toUpperCase()] || "01";
-    out.fecha = `${anio}-${mes}-${dia}`;
+  // Fecha: período LECTURA ANTERIOR → LECTURA ACTUAL, punto medio (mes
+  // predominante). Fallback legado: VENCIMIENTO → LECTURA ACTUAL.
+  const reFechaMes = (label) =>
+    texto.match(new RegExp(label + "\\s+(\\d{2})-([A-Za-z]{3})-(\\d{4})", "i"));
+  const mActual = reFechaMes("LECTURA ACTUAL");
+  const mAnterior = reFechaMes("LECTURA ANTERIOR");
+  let periodo = null;
+  if (mActual && mAnterior) {
+    periodo = rcPeriodoMedio(
+      rcFechaMesNombre(mAnterior[1], mAnterior[2], mAnterior[3]),
+      rcFechaMesNombre(mActual[1], mActual[2], mActual[3])
+    );
+  }
+  if (periodo) {
+    out.fecha = periodo.media;
+    out.periodoInicio = periodo.inicio;
+    out.periodoFin = periodo.fin;
+  } else {
+    let mFecha = texto.match(/VENCIMIENTO\s+(\d{2})-([A-Za-z]{3})-(\d{4})/i);
+    if (!mFecha) mFecha = mActual;
+    if (mFecha) {
+      const [, dia, mesStr, anio] = mFecha;
+      out.fecha = `${anio}-${RC_MESES_CL[mesStr.toUpperCase()] || "01"}-${dia}`;
+    }
   }
 
   let mCons = texto.match(/RECOLECCION AGUAS SERVIDAS\s*([0-9\.]+)/);
@@ -229,18 +300,27 @@ function rcExtraerAguas(textBundle) {
 //   - Total a pagar: "$ 931.170".
 function rcExtraerAguasDelValle(textBundle) {
   const texto = textBundle.combined;
-  const out = { numeroCliente: "", fecha: "", consumo: 0, costo: 0 };
+  const out = { numeroCliente: "", fecha: "", periodoInicio: "", periodoFin: "", consumo: 0, costo: 0 };
 
   // A. N° cliente — formato XXXXXXX-X.
   const mCli = texto.match(/\b(\d{7}-\d)\b/);
   if (mCli) out.numeroCliente = mCli[1];
 
-  // B. Fila de lecturas — tomamos fecha lectura actual y consumo_cliente.
+  // B. Fila de lecturas: "<actual> <anterior> <próx. estimada> <lect actual>
+  // <lect anterior> <consumo cliente> <a facturar>". Período = anterior→actual;
+  // fecha = punto medio (mes predominante).
   const reFila = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/;
   const mFila = texto.match(reFila);
   if (mFila) {
-    const [d, m, y] = mFila[1].split("/");
-    out.fecha = `${y}-${m}-${d}`;
+    const periodo = rcPeriodoMedio(mFila[2], mFila[1]);
+    if (periodo) {
+      out.fecha = periodo.media;
+      out.periodoInicio = periodo.inicio;
+      out.periodoFin = periodo.fin;
+    } else {
+      const [d, m, y] = mFila[1].split("/");
+      out.fecha = `${y}-${m}-${d}`;
+    }
     const consStr = String(mFila[6] || "").replace(/\./g, "").replace(",", ".");
     const cons = parseFloat(consStr);
     if (!isNaN(cons)) out.consumo = cons;
@@ -353,6 +433,8 @@ async function rcExtract(file, provider) {
       : (!datos.consumo ? "warn" : "ok");
     return [{
       date: datos.fecha || "",
+      periodoInicio: datos.periodoInicio || "",
+      periodoFin: datos.periodoFin || "",
       sucursal: "",                       // unknown from PDF; user must complete
       type,
       subcat: null,

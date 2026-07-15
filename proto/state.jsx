@@ -430,6 +430,9 @@ function reducer(state, action) {
           // metadata for Sheets/Drive sync layer
           sourceFile: r.sourceFile || null,
           numeroCliente: r.numeroCliente || "",
+          // período facturado (extraído del PDF); fecha = su punto medio
+          periodoInicio: r.periodoInicio || "",
+          periodoFin: r.periodoFin || "",
         }));
       try { window.dispatchEvent(new CustomEvent("rc:confirm", { detail: { source: "upload", provider: state.selectedProvider, records: newRecs, files: state.uploadQueue } })); } catch(e) {}
       return { ...state, records: [...newRecs, ...state.records], previewRows: [], uploadQueue: [], selectedProvider: null, uploadStep: 1 };
