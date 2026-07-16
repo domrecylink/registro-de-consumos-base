@@ -169,35 +169,193 @@ const EmisCatDonut = ({ byCat, total }) => {
   );
 };
 
-// Progreso vs meta
-const EmisGoalProgress = ({ current, goal, baseYear, baseValue }) => {
-  const reduction = baseValue > 0 ? ((baseValue - current) / baseValue) * 100 : 0;
-  const targetReduction = baseValue > 0 ? ((baseValue - goal) / baseValue) * 100 : 0;
-  const pct = Math.max(0, Math.min(100, (reduction / targetReduction) * 100));
-  const onTrack = reduction >= targetReduction * 0.6;
+// ---- Barra meta-anclada ----
+// Eje: tope = meta (la línea de meta queda al borde derecho). Solo se estira si
+// el valor real supera el 92% de la meta → tope = real/0.9 (el valor queda al
+// ~90% del eje, nunca tocando el borde).
+// mode "generacion": tope de tCO₂e, pasarse es malo → tramo rojo sobre la meta.
+// mode "reduccion": % logrado, pasarse es bueno → tramo azul sobre la meta.
+const EmisMetaBar = ({ mode, label, real, meta, fmt, unit }) => {
+  const axisMax = meta > 0
+    ? (real > meta * 0.92 ? real / 0.9 : meta)
+    : (real > 0 ? real / 0.9 : 1);
+  const pct = v => Math.max(0, Math.min(100, (v / axisMax) * 100));
+  const metaPct = pct(meta);
+  const increase = mode === "reduccion" && real < 0; // emite más que el año base
+
+  const segs = [];
+  if (mode === "generacion" && real > 0) {
+    const greenEnd = Math.min(real, meta);
+    if (greenEnd > 0) segs.push([0, greenEnd, "var(--rl-success-500)"]);
+    if (real > meta) segs.push([meta, real, "var(--rl-error-500)"]);
+  } else if (mode === "reduccion" && real > 0) {
+    if (real < meta) {
+      // el tramo logrado→meta queda descubierto: lo pinta el track con tinte rojo suave
+      segs.push([0, real, "var(--rl-error-500)"]);
+    } else {
+      segs.push([0, meta, "var(--rl-success-500)"]);
+      if (real > meta) segs.push([meta, real, "var(--rl-primary-800)"]);
+    }
+  }
+
+  const valColor = increase || (mode === "generacion" && real > meta)
+    ? "var(--rl-error-600)" : "var(--rl-gray-900)";
+  const u = unit ? " " + unit : "";
+  // Estado malo en reducción (bajo la meta o aumento): track con tinte rojo suave.
+  const badTrack = mode === "reduccion" && real < meta;
+
   return (
     <div>
       <div className="prt-spread" style={{ marginBottom: 6 }}>
-        <span style={{ font: "700 26px/1 var(--rl-font-display)", color: "var(--rl-gray-900)" }}>
-          {fmtTon(reduction, 1)}%
+        <span style={{ font: "700 10px/1 var(--rl-font-display)", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--rl-gray-500)" }}>{label}</span>
+        <span style={{ font: "700 12px/1 var(--rl-font-display)", color: valColor }}>
+          {fmt(real)}<span style={{ color: "var(--rl-gray-400)", fontWeight: 600 }}> / {fmt(meta)}{u}</span>
         </span>
-        <Chip kind={onTrack ? "success" : "warning"} size="sm" icon={onTrack ? "trending_down" : "warning"}>
-          {onTrack ? "En camino" : "Atención"}
-        </Chip>
       </div>
-      <div className="prt-hint" style={{ marginBottom: 14 }}>
-        reducción lograda · meta {fmtTon(targetReduction, 0)}% vs año base {baseYear}
+      <div style={{ position: "relative" }}>
+        <div className="emis-goal-track" style={{ overflow: "hidden", ...(badTrack ? { background: "var(--rl-error-50)" } : {}) }}>
+          {segs.map((s, i) => (
+            <span key={i} style={{
+              position: "absolute", top: 0, bottom: 0,
+              left: pct(s[0]) + "%", width: Math.max(0, pct(s[1]) - pct(s[0])) + "%",
+              background: s[2],
+            }}></span>
+          ))}
+        </div>
+        <span className="emis-goal-marker" style={{ left: metaPct + "%" }} title="Meta"></span>
       </div>
-      <div className="emis-goal-track">
-        <span className="emis-goal-fill" style={{
-          width: pct + "%",
-          background: onTrack ? "var(--rl-success-500)" : "var(--rl-warning-400)",
-        }}></span>
-        <span className="emis-goal-marker" style={{ left: "100%" }} title="Meta"></span>
+      <div style={{ position: "relative", height: 13, marginTop: 4 }}>
+        <span style={{
+          position: "absolute", whiteSpace: "nowrap",
+          font: "600 10px/1 var(--rl-font-display)", color: "var(--rl-gray-500)",
+          ...(metaPct > 65 ? { right: (100 - metaPct) + "%" } : { left: metaPct + "%", transform: "translateX(-50%)" }),
+        }}>Meta {fmt(meta)}{u}</span>
       </div>
-      <div className="prt-spread" style={{ marginTop: 10 }}>
-        <span className="prt-hint"><strong style={{ color: "var(--rl-gray-700)" }}>{fmtTon(current, 0)}</strong> tCO₂e actual</span>
-        <span className="prt-hint">meta <strong style={{ color: "var(--rl-gray-700)" }}>{fmtTon(goal, 0)}</strong> tCO₂e</span>
+      {increase && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2, font: "600 11.5px/1.3 var(--rl-font-body)", color: "var(--rl-error-600)" }}>
+          <Icon name="trending_up" size={13} /> aumento de {fmt(Math.abs(real))} vs año base
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Progreso vs meta — 100% calculado desde datos reales.
+// `current` llega anualizado (total del período / nº meses × 12).
+const EmisGoalProgress = ({ current, absGoal, relGoal, baseYear, baseValue }) => {
+  const hasAbs = absGoal > 0;
+  const hasRel = relGoal > 0;
+  const reduction = baseValue > 0 ? ((baseValue - current) / baseValue) * 100 : null;
+
+  if (!hasAbs && !hasRel) {
+    return (
+      <div style={{ textAlign: "center", padding: "14px 10px" }}>
+        <span className="prt-kpi-ico" style={{ width: 44, height: 44, margin: "0 auto 10px", background: "var(--rl-gray-100)", color: "var(--rl-gray-500)" }}>
+          <Icon name="target" size={22} />
+        </span>
+        <div style={{ font: "600 14px/1.3 var(--rl-font-display)", color: "var(--rl-gray-800)", marginBottom: 6 }}>
+          Sin meta definida
+        </div>
+        <div className="prt-hint" style={{ lineHeight: 1.5 }}>
+          Define una meta absoluta (tope de tCO₂e) o relativa (% de reducción) para seguir el progreso.
+        </div>
+      </div>
+    );
+  }
+
+  let chip;
+  if (hasRel && reduction != null) {
+    chip = reduction >= relGoal ? { kind: "success", icon: "check", label: "Meta cumplida" }
+      : reduction > 0 ? { kind: "success", icon: "trending_down", label: "En progreso" }
+      : { kind: "error", icon: "trending_up", label: "Aumento vs año base" };
+  } else if (hasAbs) {
+    chip = current <= absGoal ? { kind: "success", icon: "check", label: "Bajo el tope" }
+      : { kind: "error", icon: "warning", label: "Tope excedido" };
+  } else {
+    chip = { kind: "warning", icon: "warning", label: "Falta año base" };
+  }
+
+  // Meta anual efectiva para las cifras de contexto.
+  const goalEff = hasAbs ? absGoal : (baseValue > 0 ? baseValue * (1 - relGoal / 100) : null);
+
+  return (
+    <div>
+      {/* % logrado junto a % meta (si es computable) */}
+      <div className="prt-spread" style={{ alignItems: "flex-start", marginBottom: 16 }}>
+        <div>
+          {hasRel && reduction != null ? (
+            <>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+                <span style={{ font: "700 28px/1 var(--rl-font-display)", color: reduction < 0 ? "var(--rl-error-600)" : "var(--rl-success-700)" }}>
+                  {fmtTon(reduction, 1)}%
+                </span>
+                <span style={{ font: "600 15px/1 var(--rl-font-display)", color: "var(--rl-gray-400)" }}>/</span>
+                <span style={{ font: "700 15px/1 var(--rl-font-display)", color: "var(--rl-gray-500)" }}>
+                  {fmtTon(relGoal, 1)}%
+                </span>
+              </div>
+              <div className="prt-hint" style={{ marginTop: 5 }}>logrado vs meta · año base {baseYear}</div>
+            </>
+          ) : (
+            <>
+              <span style={{ font: "700 28px/1 var(--rl-font-display)", color: "var(--rl-gray-900)" }}>{fmtTon(current, 0)}</span>
+              <div className="prt-hint" style={{ marginTop: 5 }}>tCO₂e/año actual (anualizado)</div>
+            </>
+          )}
+        </div>
+        <Chip kind={chip.kind} size="sm" icon={chip.icon}>{chip.label}</Chip>
+      </div>
+
+      {/* Aclaración: dos lentes distintos */}
+      {hasAbs && hasRel && (
+        <div style={{
+          display: "flex", gap: 8, alignItems: "flex-start",
+          background: "var(--rl-gray-50)", borderRadius: 8,
+          padding: "9px 11px", marginBottom: 14,
+        }}>
+          <span style={{ color: "var(--rl-gray-400)", flexShrink: 0, marginTop: 1 }}><Icon name="info" size={14} /></span>
+          <span className="prt-hint" style={{ fontSize: 11, lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--rl-gray-600)" }}>Tope de emisiones</strong> mide
+            el total absoluto del año (ej: 4 de 10 tCO₂e permitidas); <strong style={{ color: "var(--rl-gray-600)" }}>Reducción
+            vs año base</strong> compara contra lo que emitías en {baseYear}. Puedes estar dentro del tope y aun
+            así haber aumentado vs el año base.
+          </span>
+        </div>
+      )}
+
+      {/* Barras: tope de generación y/o reducción */}
+      <div className="prt-stack-sm" style={{ gap: 14 }}>
+        {hasAbs && (
+          <EmisMetaBar mode="generacion" label="Tope de emisiones" real={current} meta={absGoal}
+            fmt={v => fmtTon(v, 0)} unit="tCO₂e" />
+        )}
+        {hasRel && (reduction != null ? (
+          <EmisMetaBar mode="reduccion" label="Reducción vs año base" real={reduction} meta={relGoal}
+            fmt={v => fmtTon(v, 1) + "%"} unit="" />
+        ) : (
+          <div className="prt-hint" style={{ lineHeight: 1.5 }}>
+            Define las emisiones del año base {baseYear} en Metas para medir la reducción lograda.
+          </div>
+        ))}
+      </div>
+
+      {/* Cifras de contexto */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 16,
+        padding: "12px 14px", background: "var(--rl-gray-50)", borderRadius: 10,
+      }}>
+        {[
+          { label: "Actual (anualizado)", value: current },
+          { label: `Año base ${baseYear}`, value: baseValue > 0 ? baseValue : null },
+          { label: "Meta anual", value: goalEff },
+        ].map(s => (
+          <div key={s.label}>
+            <div className="prt-hint" style={{ fontSize: 10.5, marginBottom: 3 }}>{s.label}</div>
+            <div style={{ font: "700 14px/1 var(--rl-font-display)", color: "var(--rl-gray-900)" }}>
+              {fmtTon(s.value, 0)} <span style={{ font: "500 10.5px/1 var(--rl-font-body)", color: "var(--rl-gray-500)" }}>tCO₂e</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -270,12 +428,23 @@ const ImpactoView = () => {
   const bySuc = emissionsBySucursal(state, scopeFilter, filters);
   const sinFactor = sucursalesSinFactorNombres(state);
 
-  // año base / meta (empresa)
-  const meta = state.emissions.metas.empresa;
-  // base value: emisiones anuales estimadas (suma 12m) escaladas al año base (+ meta.relativa para simular reducción ya lograda)
-  const annual = agg.total;
-  const baseValue = annual / (1 - 0.12); // simulamos que ya se ha reducido ~12% desde el año base
-  const goalAbs = meta.absoluta;
+  // Año base / meta. Si el filtro apunta a una sucursal con meta propia se usa esa;
+  // una sucursal que hereda no tiene emisiones de año base propias → sin comparación.
+  const metasAll = state.emissions.metas;
+  const sucSel = filters.sucursal !== "all"
+    ? state.configSucursales.find(s => s.nombre === filters.sucursal)
+    : null;
+  const meta = sucSel ? metasAll.sucursales[sucSel.id] : metasAll.empresa;
+  // Anualizar el período filtrado para comparar contra base/meta (valores anuales).
+  const nMonths = Math.max(1, periodToMonthKeys(filters.period).length);
+  const annualized = (agg.total / nMonths) * 12;
+  // Base efectiva: "auto" toma lo registrado en el sistema ese año; "manual" el valor ingresado.
+  const baseEmis = !meta ? 0
+    : meta.baseMode === "auto"
+      ? emissionsOfYear(state, meta.anioBase, sucSel ? sucSel.nombre : null)
+      : parseFloat(meta.baseEmissions) || 0;
+  const absGoal = meta ? parseFloat(meta.absoluta) || 0 : 0;
+  const relGoal = meta ? parseFloat(meta.relativa) || 0 : 0;
 
   const scopeChips = [
     { id: "all", label: "Todos los alcances" },
@@ -325,12 +494,9 @@ const ImpactoView = () => {
           <div className="prt-kpi-value" style={{ color: "#FFFFFF" }}>
             <span>{fmtTon(agg.total)}</span><span className="unit" style={{ color: "rgba(255,255,255,0.7)" }}>tCO₂e</span>
           </div>
-          <div className="prt-row" style={{ gap: 8 }}>
-            <span className="prt-kpi-delta" style={{ background: "rgba(255,255,255,0.16)", color: "#FFFFFF" }}>
-              <Icon name="trending_down" size={13} /> −12,0%
-            </span>
-            <span className="prt-hint" style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>vs. año base {meta.anioBase}</span>
-          </div>
+          <span className="prt-hint" style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
+            huella operacional del período seleccionado
+          </span>
         </div>
         {[1, 2, 3].map(s => {
           const v = agg.byScope[s];
@@ -380,10 +546,11 @@ const ImpactoView = () => {
             <span className="prt-kpi-ico" style={{ width: 36, height: 36, background: "var(--rl-success-50)", color: "var(--rl-success-700)" }}><Icon name="target" size={18} /></span>
             <div>
               <div className="prt-h3">Progreso vs meta</div>
-              <div className="prt-hint">Meta de reducción de empresa</div>
+              <div className="prt-hint">{sucSel ? `Meta de ${sucSel.nombre}` : "Meta de reducción de empresa"}</div>
             </div>
           </div>
-          <EmisGoalProgress current={annual} goal={goalAbs} baseYear={meta.anioBase} baseValue={baseValue} />
+          <EmisGoalProgress current={annualized} absGoal={absGoal} relGoal={relGoal}
+            baseYear={meta ? meta.anioBase : ""} baseValue={baseEmis} />
           <div className="prt-divider" style={{ margin: "18px 0 14px" }}></div>
           <button className="prt-btn sm" style={{ width: "100%" }} onClick={() => dispatch({ type: "NAVIGATE", view: "metas" })}>
             <Icon name="edit" size={15} /> Ajustar metas

@@ -92,8 +92,11 @@ function seedEmissions() {
     factoresSucursal: {},      // { [sucId]: { [key]: { value, pendingReview } } }
     refrigerantesSucursal: {}, // { [sucId]: [ { uid, tipo, cargaKg, mes } ] }
     metas: {
-      empresa: { absoluta: "", relativa: 30, anioBase: 2023 },
-      sucursales: {},          // { [sucId]: { absoluta, relativa, anioBase } }
+      // baseEmissions: tCO₂e del inventario en el año base (manual) — sin él no se
+      // calcula reducción real, no se simula. baseMode: "auto" toma las emisiones
+      // registradas en el sistema para el año base; "manual" usa baseEmissions.
+      empresa: { absoluta: "", relativa: 30, anioBase: 2023, baseEmissions: "", baseMode: "manual" },
+      sucursales: {},          // { [sucId]: { absoluta, relativa, anioBase, baseEmissions, baseMode } }
     },
   };
 }

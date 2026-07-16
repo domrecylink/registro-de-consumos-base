@@ -142,6 +142,16 @@ function emissionsBySucursal(state, scopeFilter = "all", filters) {
   });
 }
 
+// Emisiones totales registradas en un año calendario — usado por el modo
+// "año base desde registros". Devuelve 0 si no hay datos en ese año.
+function emissionsOfYear(state, year, sucursalNombre) {
+  if (!year) return 0;
+  return emissionsAggregate(state, {
+    sucursal: sucursalNombre || "all",
+    period: `custom:${year}-01:${year}-12`,
+  }).total;
+}
+
 // Lista de nombres de sucursales sin factor configurado.
 function sucursalesSinFactorNombres(state) {
   const byId = {};
@@ -187,7 +197,7 @@ const CAT_META = {
 
 Object.assign(window, {
   sucSinFactorIds, factorFor, isCustomFactor, emissionsByRecord, refrigEmissionRows,
-  emissionsAggregate, emissionsByMonth, emissionsBySucursal,
+  emissionsAggregate, emissionsByMonth, emissionsBySucursal, emissionsOfYear,
   sucursalesSinFactorNombres, pendingOverrides,
   SCOPE_COLORS, CAT_META,
 });

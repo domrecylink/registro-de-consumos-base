@@ -277,8 +277,8 @@ async function rcDeleteSucursal(id) {
 //   factor-empresa  | ""    | key | value | "" | "" | ""
 //   factor-sucursal | sucId | key | value | "Sí"/"No" pendingReview | "" | ""
 //   refrigerante    | sucId | uid | cargaKg | "" | tipo | mes
-//   meta-empresa    | ""    | absoluta|relativa|anioBase | value | "" | "" | ""
-//   meta-sucursal   | sucId | absoluta|relativa|anioBase | value | "" | "" | ""
+//   meta-empresa    | ""    | absoluta|relativa|anioBase|baseEmissions | value | "" | "" | ""
+//   meta-sucursal   | sucId | absoluta|relativa|anioBase|baseEmissions | value | "" | "" | ""
 
 function rcFlattenEmissions(emissions) {
   const rows = [];
@@ -309,11 +309,11 @@ function rcFlattenEmissions(emissions) {
     });
   });
   const me = (e.metas && e.metas.empresa) || {};
-  ["absoluta", "relativa", "anioBase"].forEach(k => {
+  ["absoluta", "relativa", "anioBase", "baseEmissions", "baseMode"].forEach(k => {
     if (me[k] != null && me[k] !== "") rows.push(["meta-empresa", "", k, me[k], "", "", ""]);
   });
   Object.entries((e.metas && e.metas.sucursales) || {}).forEach(([sucId, m]) => {
-    ["absoluta", "relativa", "anioBase"].forEach(k => {
+    ["absoluta", "relativa", "anioBase", "baseEmissions", "baseMode"].forEach(k => {
       if (m && m[k] != null && m[k] !== "") rows.push(["meta-sucursal", sucId, k, m[k], "", "", ""]);
     });
   });

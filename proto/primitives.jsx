@@ -468,6 +468,8 @@ const Select = React.forwardRef(({
   const triggerRef = React.useRef(null);
   const searchRef = React.useRef(null);
   const pickedRef = React.useRef(false);
+  const menuRef = React.useRef(null);
+  const [menuPos, setMenuPos] = React.useState(null);
 
   const opts = (options || []).map(o => typeof o === "string" ? { value: o, label: o } : o);
   const sel = opts.find(o => o.value === value) || null;
@@ -493,7 +495,9 @@ const Select = React.forwardRef(({
     if (!open) return;
     pickedRef.current = false;
     const onDoc = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+      const inRoot = rootRef.current && rootRef.current.contains(e.target);
+      const inMenu = menuRef.current && menuRef.current.contains(e.target);
+      if (!inRoot && !inMenu) setOpen(false);
     };
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
@@ -508,6 +512,31 @@ const Select = React.forwardRef(({
         if (onClose) onClose();
       }
       if (onBlur) onBlur();
+    };
+  }, [open]);
+
+  // El menú se renderiza en portal (position: fixed) para que no lo recorten
+  // contenedores con overflow: hidden (ej. .prt-card.flush).
+  React.useLayoutEffect(() => {
+    if (!open) { setMenuPos(null); return; }
+    const update = () => {
+      const r = triggerRef.current && triggerRef.current.getBoundingClientRect();
+      if (!r) return;
+      const menuH = menuRef.current ? menuRef.current.offsetHeight : 320;
+      const below = window.innerHeight - r.bottom - 12;
+      const flip = below < Math.min(menuH, 320) && r.top > below;
+      setMenuPos({
+        left: r.left, width: r.width,
+        top: flip ? undefined : r.bottom + 6,
+        bottom: flip ? window.innerHeight - r.top + 6 : undefined,
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
   }, [open]);
 
@@ -557,12 +586,13 @@ const Select = React.forwardRef(({
           </span>
         )}
       </button>
-      {open && (
+      {open && menuPos && ReactDOM.createPortal(
         <div
+          ref={menuRef}
           role="listbox"
           style={{
-            position: "absolute", top: "calc(100% + 6px)", left: 0,
-            minWidth: "100%", zIndex: 100,
+            position: "fixed", top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left,
+            minWidth: menuPos.width, zIndex: 1000,
             background: "#fff", border: "1px solid var(--rl-gray-200)", borderRadius: 10,
             boxShadow: "0 12px 28px rgba(16,24,40,0.10)",
             padding: 6, maxHeight: 320, overflowY: "auto",
@@ -621,7 +651,8 @@ const Select = React.forwardRef(({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
