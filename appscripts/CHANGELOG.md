@@ -7,3 +7,4 @@ código = versión activa (verificable con `?action=ping`).
 |---------|-------|---------|
 | v1 | 2026-07-01 | Base inicial: concurrencia (withLock), upsertSucursal/deleteSucursal, SCRIPT_VERSION en ping |
 | v2 | 2026-07-13 | Módulo Medidores: hojas Medidores/Lecturas Medidor/Precios Medidor (getSheetRows/setSheetRows + acciones get/set), uploadFile con subfolders, deleteFile (papelera Drive) |
+| v3 | 2026-07-17 | Columna "Facturable" en hoja Medidores (medidores excluidos del proceso de facturación) |

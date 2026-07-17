@@ -391,10 +391,12 @@ async function rcWriteEmissions(emissions) {
 // viajan dentro de las filas de lecturas: una fila por (medidor, mes) con lectura
 // y/o links de Drive.
 
-// Medidores: [id, sucursal, tipo, nombre, numero, activo]
+// Medidores: [id, sucursal, tipo, nombre, numero, activo, facturable]
+// Facturable vacío = "Sí" (medidores creados antes de esta columna).
 function rcFlattenMedidores(meters) {
   return (meters || []).map(m => [
     m.id, m.sucursal || "", m.type || "", m.nombre || "", m.numero || "", m.activo ? "Sí" : "No",
+    m.facturable === false ? "No" : "Sí",
   ]);
 }
 function rcUnflattenMedidores(rows) {
@@ -405,6 +407,7 @@ function rcUnflattenMedidores(rows) {
     nombre: r[3] || "",
     numero: r[4] != null ? String(r[4]) : "",
     activo: String(r[5]).trim().toLowerCase() !== "no",
+    facturable: String(r[6] == null ? "" : r[6]).trim().toLowerCase() !== "no",
   }));
 }
 

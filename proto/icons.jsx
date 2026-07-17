@@ -50,6 +50,7 @@ const ICON_PATHS = {
   inbox:         <g><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></g>,
   apartment:     <g><path d="M3 21h18M5 21V7l7-4 7 4v14"/><line x1="9" y1="9"  x2="9" y2="9.01"/><line x1="9" y1="13" x2="9" y2="13.01"/><line x1="9" y1="17" x2="9" y2="17.01"/><line x1="15" y1="9"  x2="15" y2="9.01"/><line x1="15" y1="13" x2="15" y2="13.01"/><line x1="15" y1="17" x2="15" y2="17.01"/></g>,
   payments:      <g><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/></g>,
+  money_off:     <g><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><line x1="4" y1="4" x2="20" y2="20"/></g>,
 
   // Type-specific
   bolt:               <g><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></g>,

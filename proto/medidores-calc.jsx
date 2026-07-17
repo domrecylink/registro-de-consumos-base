@@ -100,11 +100,17 @@ function boletaFor(records, suc, type, month) {
   return any ? sum : null;
 }
 
-// Totales por mes para el footer de la matriz.
+// ¿El medidor entra en el proceso de facturación? Default sí: solo queda
+// fuera si fue configurado explícitamente con facturable = false.
+function medFacturable(m) { return !m || m.facturable !== false; }
+
+// Totales por mes para el footer de la matriz. Los medidores configurados
+// como "no facturables" no suman al total calculado.
 function monthTotals(meters, readings, prices, records, suc, type, month) {
   let totalMedidores = 0;
   let anyMed = false;
   (meters || []).forEach(m => {
+    if (!medFacturable(m)) return;
     const c = costoFor(readings, prices, m, month);
     if (c != null) { totalMedidores += c; anyMed = true; }
   });
@@ -150,6 +156,6 @@ const PAY_CHIP  = { "por-facturar": "neutral",       "facturado": "info",      "
 
 Object.assign(window, {
   MED_TYPES, medUnit, meterReadings, meterReadingFor, prevReading, nextReading,
-  isFirstReading, monthsGap, consumoFor, priceFor, costoFor, boletaFor, monthTotals,
+  isFirstReading, monthsGap, consumoFor, priceFor, costoFor, boletaFor, monthTotals, medFacturable,
   validateReading, payStatus, PAY_LABEL, PAY_CHIP,
 });

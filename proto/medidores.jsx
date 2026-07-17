@@ -420,12 +420,46 @@ const ResumenTab = ({ suc, type, meters, monthsView }) => {
 };
 
 // ============================================================
+// Icono ⚠ + tooltip con medidores no facturables. El tooltip va en un
+// portal con position fixed: dentro de la celda lo recorta el overflow
+// del contenedor de la tabla (mismo truco que el menú del Select).
+// ============================================================
+const MedNoFactTip = ({ meters }) => {
+  const [pos, setPos] = React.useState(null);
+  const ref = React.useRef(null);
+  const show = () => {
+    const r = ref.current && ref.current.getBoundingClientRect();
+    if (r) setPos({ top: r.top - 8, left: r.left + r.width / 2 });
+  };
+  return (
+    <span ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)}
+      style={{ marginLeft: 6, verticalAlign: "middle", display: "inline-flex", cursor: "help" }}>
+      <Icon name="warning" size={14} style={{ color: "var(--rl-warning-500)" }} />
+      {pos && ReactDOM.createPortal(
+        <span style={{
+          position: "fixed", top: pos.top, left: pos.left, transform: "translate(-50%, -100%)",
+          background: "var(--rl-gray-900)", color: "#fff", padding: "8px 12px", borderRadius: 8,
+          font: "500 12px/16px var(--rl-font-body)", whiteSpace: "nowrap", zIndex: 1000, pointerEvents: "none",
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 2 }}>No suman al total (configurados para no facturar):</div>
+          {meters.map(m => (
+            <div key={m.id}>· {m.nombre}{m.numero ? " — N° " + m.numero : ""}</div>
+          ))}
+        </span>,
+        document.body
+      )}
+    </span>
+  );
+};
+
+// ============================================================
 // Tab: Matriz (medidores × meses)
 // ============================================================
 const MatrizTab = ({ suc, type, meters, monthsView }) => {
   const { state } = useApp();
   const M = state.medidores;
   const u = medUnit(type);
+  const noFacturables = meters.filter(m => !medFacturable(m));
 
   if (!meters.length) return null;
 
@@ -499,7 +533,12 @@ const MatrizTab = ({ suc, type, meters, monthsView }) => {
               { key: "diferencia",     label: "Diferencia" },
             ].map(row => (
               <tr key={row.key} className={"rc-med-foot " + row.key}>
-                <td className="rc-med-sticky">{row.label}</td>
+                <td className="rc-med-sticky">
+                  {row.label}
+                  {row.key === "totalMedidores" && noFacturables.length > 0 && (
+                    <MedNoFactTip meters={noFacturables} />
+                  )}
+                </td>
                 {monthsView.map(mk => {
                   const t = monthTotals(meters, M.readings, M.prices, state.records, suc, type, mk);
                   let content, cls = "";
@@ -575,7 +614,9 @@ const MensualTab = ({ suc, type, meters }) => {
                   </td>
                   <td className="rc-med-num-cell">{costo == null ? "—" : fmtCLP(costo)}</td>
                   <td style={{ textAlign: "center" }}>
-                    <Chip kind={PAY_CHIP[st]} size="sm">{PAY_LABEL[st]}</Chip>
+                    {!medFacturable(m)
+                      ? <Chip kind="warning" size="sm" icon="money_off">No se factura</Chip>
+                      : <Chip kind={PAY_CHIP[st]} size="sm">{PAY_LABEL[st]}</Chip>}
                   </td>
                   <td>
                     <div className="rc-med-doc-pair full">
@@ -643,7 +684,11 @@ const PagosTab = ({ meters, monthsView }) => {
                   <strong>{m.nombre}</strong>
                   {m.numero && <span className="rc-med-num">N° {m.numero}</span>}
                 </td>
-                {monthsView.map(mk => {
+                {!medFacturable(m) ? (
+                  <td colSpan={monthsView.length} style={{ textAlign: "center" }}>
+                    <Chip kind="warning" size="sm" icon="money_off">Configurado para no ser facturado</Chip>
+                  </td>
+                ) : monthsView.map(mk => {
                   const st = payStatus(M.docs, m.id, mk);
                   return (
                     <td key={mk} style={{ textAlign: "center" }}>
@@ -739,8 +784,14 @@ const MedManageModal = ({ suc, type, onClose }) => {
                       <strong>{m.nombre}</strong>
                       {m.numero && <span className="rc-med-num">N° {m.numero}</span>}
                       {!m.activo && <Chip size="sm" kind="neutral">Inactivo</Chip>}
+                      {!medFacturable(m) && <Chip size="sm" kind="warning">No se factura</Chip>}
                     </div>
                     <Btn size="sm" kind="ghost" icon="edit" onClick={() => startEdit(m)}>Editar</Btn>
+                    <Btn size="sm" kind="ghost" icon={medFacturable(m) ? "money_off" : "payments"}
+                      title={medFacturable(m) ? "Excluir del proceso de facturación" : "Volver a incluir en facturación"}
+                      onClick={() => dispatch({ type: "MED/EDIT_METER", id: m.id, patch: { facturable: !medFacturable(m) } })}>
+                      {medFacturable(m) ? "No facturar" : "Facturar"}
+                    </Btn>
                     <Btn size="sm" kind="ghost" icon={m.activo ? "close" : "check"}
                       onClick={() => dispatch({ type: "MED/TOGGLE_METER", id: m.id })}>
                       {m.activo ? "Desactivar" : "Reactivar"}
@@ -753,6 +804,7 @@ const MedManageModal = ({ suc, type, onClose }) => {
           <div className="prt-hint" style={{ fontSize: 12, marginTop: 12, display: "flex", gap: 6, alignItems: "center" }}>
             <Icon name="info" size={14} />
             Desactivar no borra el historial: el medidor deja de aparecer en los meses futuros.
+            Un medidor con "No facturar" sigue registrando lecturas, pero no suma al total calculado ni entra al proceso de facturación.
           </div>
         </div>
       </div>
@@ -863,7 +915,7 @@ function medExportExcel(M, records, dispatch) {
         lect == null ? "" : lect,
         cons == null ? "" : cons, u,
         costo == null ? "" : Math.round(costo),
-        PAY_LABEL[payStatus(M.docs, m.id, mk)],
+        medFacturable(m) ? PAY_LABEL[payStatus(M.docs, m.id, mk)] : "Configurado para no ser facturado",
         (d.factura && d.factura.link) || "",
         (d.pago && d.pago.link) || "",
         (d.respaldo && d.respaldo.link) || "",
@@ -932,7 +984,8 @@ function medDownloadReport({ suc, type, meters, M, records, state }) {
   }));
   // Totales por mes
   const totCons = rep.map((mk, ci) => rows.reduce((a, r) => a + (r.cells[ci].cons == null ? 0 : r.cells[ci].cons), 0));
-  const totCosto = rep.map((mk, ci) => rows.reduce((a, r) => a + (r.cells[ci].costo == null ? 0 : r.cells[ci].costo), 0));
+  // Costo total solo con medidores facturables (consumo físico sí suma todos).
+  const totCosto = rep.map((mk, ci) => rows.reduce((a, r) => a + (!medFacturable(r.m) || r.cells[ci].costo == null ? 0 : r.cells[ci].costo), 0));
   const anyCons = rep.map((mk, ci) => rows.some(r => r.cells[ci].cons != null));
   const consUlt = totCons[totCons.length - 1] || 0;
   const consPrev = totCons.length > 1 ? totCons[totCons.length - 2] : 0;
@@ -1000,7 +1053,9 @@ function medDownloadReport({ suc, type, meters, M, records, state }) {
   for (let i = 0; i < repIdx.length; i += PAY_CHUNK) payChunks.push(repIdx.slice(i, i + PAY_CHUNK));
   const payTable = (chunk) => {
     const head = chunk.map(({ mk }) => `<th style="text-align:center;padding:8px;font-size:10.5px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">${monthLabelShort(mk)}</th>`).join("");
-    const body = rows.map(r => `<tr><td style="text-align:left;padding:9px 10px;border-bottom:1px solid #EEE;font-weight:700;color:#101828;">${esc(r.m.nombre)}${r.m.numero ? ` <span style="color:#919599;font-weight:400;">· N° ${esc(r.m.numero)}</span>` : ""}</td>${chunk.map(({ ci }) => r.cells[ci]).map(c => `<td style="text-align:center;padding:9px 8px;border-bottom:1px solid #EEE;">${payChip(c.pay)}</td>`).join("")}</tr>`).join("");
+    const body = rows.map(r => `<tr><td style="text-align:left;padding:9px 10px;border-bottom:1px solid #EEE;font-weight:700;color:#101828;">${esc(r.m.nombre)}${r.m.numero ? ` <span style="color:#919599;font-weight:400;">· N° ${esc(r.m.numero)}</span>` : ""}</td>${!medFacturable(r.m)
+      ? `<td colspan="${chunk.length}" style="text-align:center;padding:9px 8px;border-bottom:1px solid #EEE;color:#B54708;font-weight:600;">Configurado para no ser facturado</td>`
+      : chunk.map(({ ci }) => r.cells[ci]).map(c => `<td style="text-align:center;padding:9px 8px;border-bottom:1px solid #EEE;">${payChip(c.pay)}</td>`).join("")}</tr>`).join("");
     return `<table style="font-size:10.5px;"><thead><tr><th style="text-align:left;padding:8px 10px;font-size:11px;font-weight:700;color:#344054;border-bottom:1px solid #E4E7EC;">Medidor</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
   };
   const payTables = payChunks.map(payTable).join(`<div style="height:12px;"></div>`);

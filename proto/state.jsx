@@ -124,7 +124,7 @@ function seedMedidores() {
     tab: "resumen",             // resumen | matriz | mensual | pagos
     period: "3m",               // 12m | 6m | 3m | 1m | custom:YYYY-MM:YYYY-MM
     mensualMonth: CURRENT_MONTH_KEY,
-    meters: [],                 // { id, sucursal, type, nombre, numero, activo }
+    meters: [],                 // { id, sucursal, type, nombre, numero, activo, facturable }
     readings: [],               // { id, meterId, month:"YYYY-MM", lectura:number }
     prices: [],                 // { sucursal, type, month:"YYYY-MM", precio:number }
     docs: {},                   // { [meterId+"__"+month]: { factura:{link,fileId,name}, pago:{...} } }
@@ -703,6 +703,7 @@ function reducer(state, action) {
         nombre: (action.nombre || "").trim(),
         numero: (action.numero || "").trim(),
         activo: true,
+        facturable: true,
       };
       return { ...state, medidores: { ...state.medidores, meters: [...state.medidores.meters, meter] } };
     }
