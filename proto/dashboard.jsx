@@ -486,9 +486,11 @@ const TypeTabs = () => {
           </button>
         );
       })}
+      {/* Botón Exportar oculto: sin funcionalidad por ahora. Reactivar cuando exista el exportable.
       <div style={{ marginLeft: "auto", paddingBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
         <Btn size="sm" icon="file_download">Exportar</Btn>
       </div>
+      */}
     </div>
   );
 };
@@ -783,7 +785,9 @@ const RecentTable = () => {
             ]}
           />
           <Chip size="sm">{rangeStart}–{rangeEnd} de {sorted.length}</Chip>
+          {/* Botón Ver todo oculto: sin funcionalidad por ahora.
           <Btn size="sm" icon="open_in_new">Ver todo</Btn>
+          */}
         </div>
       </div>
 
