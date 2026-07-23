@@ -335,6 +335,74 @@ function rcExtraerAguasDelValle(textBundle) {
   return out;
 }
 
+// ----- ESVAL parser (agua) ------------------------------------------------
+// Boleta electrónica ESVAL (Viña / V Región). Estructura del text layer:
+//   - N° Cliente: formato NNNNNN-DV (6-7 díg + guión + dígito o "K", ej.
+//     "865915-K"). En la capa de texto suele venir PEGADO a la fecha de
+//     emisión ("13-02-2026865915-K"); el patrón NNNNNN-DV no colisiona con el
+//     RUT de ESVAL (con puntos: 76.000.739-0), la Ruta de Lectura
+//     (10-143-4254-0) ni las fechas (DD-MM-YYYY).
+//   - Fechas de Lecturas: "Anterior 10/01/2026 · Actual 10/02/2026" — lecturas
+//     mensuales que caen el MISMO día en meses consecutivos → firma del ciclo.
+//   - Consumos: "A Facturar 388,00m3"; en detalle "Recolección 388,00 m3" y
+//     "Tratamiento 388,00 m3" repiten el volumen total facturado.
+//   - Monto: "Monto Total $ 1.031.116" (línea de texto), o "TOTAL A PAGAR" /
+//     "Subtotal del mes" como respaldo.
+function rcExtraerEsval(textBundle) {
+  const texto = textBundle.combined;
+  const out = { numeroCliente: "", fecha: "", periodoInicio: "", periodoFin: "", consumo: 0, costo: 0 };
+
+  // A. N° cliente — NNNNNN-DV. El cliente viene tras la fecha de emisión
+  // (DD-MM-YYYY), a veces PEGADO ("13-02-2026865915-K"): anclar en la fecha la
+  // consume primero y evita que su último dígito se cuele en el número greedy.
+  // Fallback: match suelto con lookbehind para no arrastrar un dígito previo.
+  let mCli = texto.match(/\d{2}-\d{2}-\d{4}\s*(\d{6,7}-[\dkK])(?![\d-])/);
+  if (!mCli) mCli = texto.match(/(?<!\d)(\d{6,7}-[\dkK])(?![\d-])/);
+  if (mCli) out.numeroCliente = mCli[1];
+
+  // B. Período de lectura → punto medio (mes predominante). Estrategia por capas:
+  //  1) par de fechas con el MISMO día y meses consecutivos (lecturas mensuales).
+  //  2) fallback: primer par DD/MM/YYYY con duración de ciclo válida (15-62 d).
+  const fechas = texto.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || [];
+  let periodo = null;
+  for (let i = 0; i < fechas.length && !periodo; i++) {
+    for (let j = 0; j < fechas.length; j++) {
+      if (i === j) continue;
+      const d1 = Number(fechas[i].slice(0, 2)), d2 = Number(fechas[j].slice(0, 2));
+      if (d1 !== d2) continue;
+      const p = rcPeriodoMedio(fechas[i], fechas[j]) || rcPeriodoMedio(fechas[j], fechas[i]);
+      if (p) { periodo = p; break; }
+    }
+  }
+  if (!periodo) {
+    for (let i = 0; i < fechas.length && !periodo; i++)
+      for (let j = i + 1; j < fechas.length; j++) {
+        const p = rcPeriodoMedio(fechas[i], fechas[j]) || rcPeriodoMedio(fechas[j], fechas[i]);
+        if (p) { periodo = p; break; }
+      }
+  }
+  if (periodo) {
+    out.fecha = periodo.media;
+    out.periodoInicio = periodo.inicio;
+    out.periodoFin = periodo.fin;
+  }
+
+  // C. Consumo facturado (m³). "A Facturar" → detalle "Recolección"/"Tratamiento".
+  const parseM3 = (s) => parseFloat(String(s).replace(/\./g, "").replace(",", ".")) || 0;
+  let mCons = texto.match(/A\s*Facturar\s*([\d.,]+)\s*m3/i);
+  if (!mCons) mCons = texto.match(/Recolecci[oó]n\s*([\d.,]+)\s*m3/i);
+  if (!mCons) mCons = texto.match(/Tratamiento\s*([\d.,]+)\s*m3/i);
+  if (mCons) out.consumo = parseM3(mCons[1]);
+
+  // D. Costo — "Monto Total", respaldo "Total a pagar" / "Subtotal del mes".
+  let mTot = texto.match(/Monto\s*Total\s*\$?\s*([\d.]+)/i);
+  if (!mTot) mTot = texto.match(/Total\s*a\s*Pagar\s*\$?\s*([\d.]+)/i);
+  if (!mTot) mTot = texto.match(/Subtotal del mes\s*\$?\s*([\d.]+)/i);
+  if (mTot) out.costo = parseInt(String(mTot[1]).replace(/\./g, ""), 10) || 0;
+
+  return out;
+}
+
 // ----- Iconstruye Excel parser (replica de appscript.txt) ----------------
 const RC_EXCEL = {
   FILA_DATOS: 14,
@@ -416,6 +484,8 @@ async function rcExtract(file, provider) {
       datos = rcExtraerEnel(text); type = "electricidad";
     } else if (provider.id === "aguas-del-valle") {
       datos = rcExtraerAguasDelValle(text); type = "agua";
+    } else if (provider.id === "esval") {
+      datos = rcExtraerEsval(text); type = "agua";
     } else if (provider.id === "aguas-andinas" || provider.type === "agua") {
       datos = rcExtraerAguas(text); type = "agua";
     } else if (provider.id === "generic") {
