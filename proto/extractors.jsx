@@ -403,6 +403,61 @@ function rcExtraerEsval(textBundle) {
   return out;
 }
 
+// ----- Chilquinta parser (electricidad) -----------------------------------
+// Boleta electrónica Chilquinta (V Región). Layout con etiquetas en el text
+// layer (a diferencia de Enel):
+//   - "N° CLIENTE: 541947 - 6" (espacios alrededor del guión).
+//   - "LECTURAS Desde 04 may 2021 al 04 jun 2021" (mes en español, minúscula).
+//   - "Electricidad consumida 1.863 kWh" = energía facturada (NO el 'Consumo'
+//     de la tabla de lecturas, que es la dif. de registros del medidor).
+//   - Total a pagar junto al vencimiento: "01 jul 2021 $ 676.022"; respaldo
+//     "asciende a $ 676.022".
+// "04 may 2021" → "04/05/2021" (formato que espera rcPeriodoMedio).
+function rcFechaTextoCL(s) {
+  const m = String(s).trim().match(/(\d{1,2})\s+([A-Za-zñÑ]{3,})\s+(\d{4})/);
+  if (!m) return null;
+  const mes = RC_MESES_CL[m[2].slice(0, 3).toUpperCase()];
+  if (!mes) return null;
+  return `${String(m[1]).padStart(2, "0")}/${mes}/${m[3]}`;
+}
+
+function rcExtraerChilquinta(textBundle) {
+  const texto = textBundle.combined;
+  const out = { numeroCliente: "", fecha: "", periodoInicio: "", periodoFin: "", consumo: 0, costo: 0 };
+
+  // A. N° Cliente — etiquetado, con espacios alrededor del guión.
+  const mCli = texto.match(/N[°º]?\s*CLIENTE:?\s*(\d{5,7})\s*-\s*([\dkK])/i);
+  if (mCli) out.numeroCliente = mCli[1] + "-" + mCli[2];
+
+  // B. Período de lectura → punto medio. Fallback: FECHA EMISIÓN.
+  const mPer = texto.match(/Desde\s+(\d{1,2}\s+[A-Za-zñÑ]{3,}\s+\d{4})\s+al\s+(\d{1,2}\s+[A-Za-zñÑ]{3,}\s+\d{4})/i);
+  let periodo = null;
+  if (mPer) {
+    const ini = rcFechaTextoCL(mPer[1]), fin = rcFechaTextoCL(mPer[2]);
+    if (ini && fin) periodo = rcPeriodoMedio(ini, fin);
+  }
+  if (periodo) {
+    out.fecha = periodo.media;
+    out.periodoInicio = periodo.inicio;
+    out.periodoFin = periodo.fin;
+  } else {
+    const mEmis = texto.match(/FECHA\s*EMISI[OÓ]N:?\s*(\d{1,2}\s+[A-Za-zñÑ]{3,}\s+\d{4})/i);
+    const f = mEmis && rcFechaTextoCL(mEmis[1]);
+    if (f) { const [d, m, y] = f.split("/"); out.fecha = `${y}-${m}-${d}`; }
+  }
+
+  // C. Consumo — "Electricidad consumida 1.863 kWh".
+  const mCons = texto.match(/Electricidad consumida\s+([\d.]+)\s*kWh/i);
+  if (mCons) out.consumo = parseInt(mCons[1].replace(/\./g, ""), 10) || 0;
+
+  // D. Costo — total a pagar junto al vencimiento; respaldo "asciende a $".
+  let mTot = texto.match(/\d{1,2}\s+[A-Za-zñÑ]{3,}\s+\d{4}\s+\$\s*([\d.]+)/);
+  if (!mTot) mTot = texto.match(/asciende a\s*\$\s*([\d.]+)/i);
+  if (mTot) out.costo = parseInt(String(mTot[1]).replace(/\./g, ""), 10) || 0;
+
+  return out;
+}
+
 // ----- Iconstruye Excel parser (replica de appscript.txt) ----------------
 const RC_EXCEL = {
   FILA_DATOS: 14,
@@ -480,6 +535,8 @@ async function rcExtract(file, provider) {
     let datos, type;
     if (provider.id === "cge") {
       datos = rcExtraerCGE(text); type = "electricidad";
+    } else if (provider.id === "chilquinta") {
+      datos = rcExtraerChilquinta(text); type = "electricidad";
     } else if (provider.id === "enel" || (provider.type === "electricidad" && provider.id !== "generic")) {
       datos = rcExtraerEnel(text); type = "electricidad";
     } else if (provider.id === "aguas-del-valle") {
